@@ -1,6 +1,8 @@
-<script setup>
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElLoading } from 'element-plus';
+
+const { t } = useI18n();
 import { getCurrentUserId, findUserSignature, saveToCurrentSelection, saveSignatureToConfig } from '../utils/bitableOps';
 import { bitable } from '@lark-base-open/js-sdk';
 
@@ -47,12 +49,12 @@ const switchToDraw = () => {
 const useOldSignature = async () => {
   if (!savedSignature.value) return;
   
-  const loadingInstance = ElLoading.service({ text: '正在应用签名...' });
+  const loadingInstance = ElLoading.service({ text: t('pad.loading_apply') });
   try {
     const success = await saveToCurrentSelection(savedSignature.value);
-    if (success) ElMessage.success('签名已应用！');
+    if (success) ElMessage.success(t('pad.apply_success'));
   } catch (e) {
-    ElMessage.error('应用失败: ' + e.message);
+    ElMessage.error(t('pad.apply_fail') + ': ' + e.message);
   } finally {
     loadingInstance.close();
   }
@@ -62,11 +64,11 @@ const useOldSignature = async () => {
 const saveNewSignature = async () => {
   const { isEmpty, data } = signaturePad.value.saveSignature();
   if (isEmpty) {
-    ElMessage.warning('请先写下您的名字');
+    ElMessage.warning(t('pad.sign_hint'));
     return;
   }
 
-  const loadingInstance = ElLoading.service({ text: '正在上传并存档...' });
+  const loadingInstance = ElLoading.service({ text: t('pad.loading_save') });
   try {
     // 1. base64 转 File 对象
     const blob = await (await fetch(data)).blob();
@@ -79,12 +81,12 @@ const saveNewSignature = async () => {
     if (success) {
       const userId = await getCurrentUserId();
       saveSignatureToConfig(userId, file); // 这里的 file 最好是上传后返回的 token，但 SDK 允许直接存 File，为了简化逻辑先这样
-      ElMessage.success('签名保存成功！');
+      ElMessage.success(t('pad.save_success'));
       // 更新本地缓存
       savedSignature.value = file; // 实际上这里应该存 Token，刷新后才会变成 Token
     }
   } catch (e) {
-    ElMessage.error('保存失败: ' + e.message);
+    ElMessage.error(t('pad.save_fail') + ': ' + e.message);
   } finally {
     loadingInstance.close();
   }
@@ -94,23 +96,23 @@ const saveNewSignature = async () => {
 <template>
   <div class="container">
     <div class="header">
-      <h3>✍️ 在线电子签名</h3>
-      <p class="sub-text">签名将自动保存到附件列</p>
+      <h3>{{ $t('pad.title') }}</h3>
+      <p class="sub-text">{{ $t('pad.sub_text') }}</p>
     </div>
 
     <div v-if="mode === 'preview'" class="preview-area">
-      <el-alert title="检测到您有常用签名" type="success" :closable="false" show-icon />
+      <el-alert :title="$t('pad.history_alert')" type="success" :closable="false" show-icon />
       <div class="img-wrapper">
         <div class="placeholder-sig">
-          [ 您的历史签名存档 ]
+          {{ $t('pad.history_title') }}
         </div>
       </div>
       <div class="btn-group">
         <el-button type="primary" size="large" @click="useOldSignature">
-          ✅ 使用此签名
+          {{ $t('pad.use_history') }}
         </el-button>
         <el-button size="large" @click="switchToDraw">
-          ✏️ 重新手写
+          {{ $t('pad.redraw') }}
         </el-button>
       </div>
     </div>
@@ -124,11 +126,11 @@ const saveNewSignature = async () => {
           :options="{ penColor: '#000000', backgroundColor: 'rgba(255,255,255,0)' }"
         />
       </div>
-      <div class="tips">请在上方空白区域书写</div>
+      <div class="tips">{{ $t('pad.draw_placeholder') }}</div>
       <div class="btn-group">
-        <el-button @click="clear">清空</el-button>
-        <el-button type="primary" @click="saveNewSignature">确认保存</el-button>
-        <el-button v-if="savedSignature" link @click="mode = 'preview'">返回</el-button>
+        <el-button @click="clear">{{ $t('pad.clear_btn') }}</el-button>
+        <el-button type="primary" @click="saveNewSignature">{{ $t('pad.confirm_btn') }}</el-button>
+        <el-button v-if="savedSignature" link @click="mode = 'preview'">{{ $t('pad.back_btn') }}</el-button>
       </div>
     </div>
   </div>

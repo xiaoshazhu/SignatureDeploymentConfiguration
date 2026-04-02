@@ -7,40 +7,40 @@
         <div class="quota-header">
           <div class="quota-title">
             <el-icon><CreditCard /></el-icon>
-            <span>套餐额度</span>
+            <span>{{ $t('common.quota_title') }}</span>
           </div>
           <div class="quota-actions">
-            <el-button type="primary" size="small" plain @click="showPricing = true">充值续费</el-button>
+            <el-button type="primary" size="small" plain @click="showPricing = true">{{ $t('common.recharge_btn') }}</el-button>
           </div>
         </div>
         <div class="quota-stats">
           <div class="stat-item">
-            <span class="stat-label">总额度:</span>
-            <span class="stat-value">{{ quotaInfo.total }}次</span>
+            <span class="stat-label">{{ $t('common.total_quota') }}:</span>
+            <span class="stat-value">{{ quotaInfo.total }}{{ $t('common.times') }}</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">已使用:</span>
-            <span class="stat-value">{{ quotaInfo.used }}次</span>
+            <span class="stat-label">{{ $t('common.used_quota') }}:</span>
+            <span class="stat-value">{{ quotaInfo.used }}{{ $t('common.times') }}</span>
           </div>
           <div class="stat-item highlight">
-            <span class="stat-label">剩余余额:</span>
-            <span class="stat-value">{{ quotaInfo.remaining }}次</span>
+            <span class="stat-label">{{ $t('common.remaining_quota') }}:</span>
+            <span class="stat-value">{{ quotaInfo.remaining }}{{ $t('common.times') }}</span>
           </div>
         </div>
       </el-card>
 
       <!-- 温馨提示 -->
       <el-alert
-        title="温馨提示"
+        :title="$t('common.tips_title')"
         type="info"
         :closable="false"
         class="compact-tips"
       >
         <template #default>
           <div class="tips-content">
-            <p>1、切换数据表格之后,请重新打开插件页面</p>
-            <p>2、操作将消耗套餐次数 (1条记录 = 1次)</p>
-            <p>3、批量生成只针对未生成签字链接的数据行</p>
+            <p>1、{{ $t('common.tip_switch_table') }}</p>
+            <p>2、{{ $t('common.tip_consume_quota') }}</p>
+            <p>3、{{ $t('common.tip_batch_new_only') }}</p>
           </div>
         </template>
       </el-alert>
@@ -48,17 +48,17 @@
       <!-- 批量配置区域 -->
       <el-card class="config-card" shadow="never">
         <template #header>
-          <span>批量配置</span>
+          <span>{{ $t('config.batch_title') }}</span>
         </template>
 
-        <el-form-item label="签字模式">
+        <el-form-item :label="$t('config.sign_mode')">
           <el-radio-group v-model="config.signMode" @change="onConfigChange">
-            <el-radio label="或签">或签(任意一人签字即可)</el-radio>
-            <el-radio label="会签">会签(所有人都需签字)</el-radio>
+            <el-radio label="或签">{{ $t('config.any_sign') }}</el-radio>
+            <el-radio label="会签">{{ $t('config.all_sign') }}</el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="需签字人数" v-if="config.signMode === '会签'">
+        <el-form-item :label="$t('config.sign_count')" v-if="config.signMode === '会签'">
           <el-input-number 
             v-model="config.signCount" 
             :min="1" 
@@ -68,12 +68,12 @@
         </el-form-item>
 
         <!-- 未初始化时:显示生成二维码开关 -->
-        <el-form-item label="生成二维码" v-if="!isInitialized">
+        <el-form-item :label="$t('config.enable_qrcode')" v-if="!isInitialized">
           <el-switch 
             v-model="config.enableQRCode"
             @change="onConfigChange"
           />
-          <span class="form-tip">为签字链接生成二维码</span>
+          <span class="form-tip">{{ $t('config.qrcode_tip') }}</span>
         </el-form-item>
 
 
@@ -91,9 +91,9 @@
               @click="initializeTable"
               class="action-btn"
             >
-              {{ initializing ? '正在初始化...' : '初始化表格结构' }}
+              {{ initializing ? $t('config.initializing') : $t('config.init_btn') }}
             </el-button>
-            <p class="tip-text">首次使用需要初始化表格,将自动创建必要的字段</p>
+            <p class="tip-text">{{ $t('config.init_tip_first') }}</p>
           </template>
 
           <!-- 已初始化后显示批量生成 -->
@@ -105,19 +105,19 @@
               @click="batchGenerateLinks"
               class="action-btn"
             >
-              {{ generating ? '正在批量生成中...' : '批量生成签字链接' }}
+              {{ generating ? $t('config.generating') : $t('config.batch_btn') }}
             </el-button>
 
             <!-- 更多操作折叠 - 只在已初始化后显示 -->
             <el-collapse v-model="activeCollapse" style="margin-top: 16px;">
-              <el-collapse-item title="更多操作" name="more">
+              <el-collapse-item :title="$t('config.more_actions')" name="more">
                 <!-- 生成二维码开关 -->
-                <el-form-item label="生成二维码">
+                <el-form-item :label="$t('config.enable_qrcode')">
                   <el-switch 
                     v-model="config.enableQRCode"
                     @change="onQRCodeChange"
                   />
-                  <span class="form-tip">为签字链接生成二维码</span>
+                  <span class="form-tip">{{ $t('config.qrcode_tip') }}</span>
                 </el-form-item>
 
                 <!-- 重新初始化按钮 - 只有二维码开关变更时才可点击 -->
@@ -130,13 +130,13 @@
                   @click="reinitializeTable"
                   class="action-btn"
                 >
-                  {{ initializing ? '正在初始化...' : '初始化表格结构' }}
+                  {{ initializing ? $t('config.initializing') : $t('config.init_btn') }}
                 </el-button>
                 <p class="tip-text" v-if="qrcodeChanged">
-                  ⚠️ 检测到二维码开关变更,需要重新初始化表格
+                  ⚠️ {{ $t('config.qrcode_change_warn') }}
                 </p>
                 <p class="tip-text" v-else>
-                  💡 只有修改了二维码开关才需要重新初始化
+                  💡 {{ $t('config.qrcode_no_change') }}
                 </p>
               </el-collapse-item>
             </el-collapse>
@@ -147,17 +147,17 @@
       <!-- 单行操作区域 -->
       <el-card v-if="isInitialized" class="config-card" shadow="never">
         <template #header>
-          <span>单行操作</span>
+          <span>{{ $t('config.single_row_title') }}</span>
         </template>
 
-        <el-form-item label="签字模式">
+        <el-form-item :label="$t('config.sign_mode')">
           <el-radio-group v-model="singleRowConfig.mode">
-            <el-radio label="或签">或签(任意一人签字即可)</el-radio>
-            <el-radio label="会签">会签(所有人都需签字)</el-radio>
+            <el-radio label="或签">{{ $t('config.any_sign') }}</el-radio>
+            <el-radio label="会签">{{ $t('config.all_sign') }}</el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="需签字人数" v-if="singleRowConfig.mode === '会签'">
+        <el-form-item :label="$t('config.sign_count')" v-if="singleRowConfig.mode === '会签'">
           <el-input-number 
             v-model="singleRowConfig.count" 
             :min="1" 
@@ -176,13 +176,13 @@
             @click="generateSingleRowLink"
             class="action-btn"
           >
-            {{ generatingSingle ? '正在生成中...' : '为选中行生成链接' }}
+            {{ generatingSingle ? $t('config.single_generating') : $t('config.single_btn') }}
           </el-button>
           <p class="tip-text" v-if="!hasSelectedRecord">
-            💡 请先选中一行记录
+            💡 {{ $t('config.select_row_hint') }}
           </p>
           <p class="tip-text" v-else>
-            ✅ 已选中记录,点击按钮为该行生成签字链接
+            ✅ {{ $t('config.record_selected_hint') }}
           </p>
         </div>
       </el-card>
@@ -193,38 +193,38 @@
     </el-form>
 
     <!-- 充值续费对话框 -->
-    <el-dialog v-model="showPricing" title="选择充值套餐" width="90%" class="pricing-dialog" append-to-body>
+    <el-dialog v-model="showPricing" :title="$t('pay.title')" width="90%" class="pricing-dialog" append-to-body>
       <div class="pricing-grid">
         <div v-for="item in pricingPlans" :key="item.quota" class="plan-card" @click="handleRecharge(item)">
-          <div class="plan-quota">{{ item.quota }} 次</div>
-          <div class="plan-tag" v-if="item.isTest">测试包</div>
+          <div class="plan-quota">{{ item.quota }}{{ $t('common.times') }}</div>
+          <div class="plan-tag" v-if="item.isTest">{{ $t('pay.test_tag') }}</div>
           <div class="plan-price">{{ item.price }}</div>
           <div class="plan-desc" v-if="item.quota >= 500">约 {{ (parseFloat(item.price.replace('元','')) / item.quota).toFixed(3) }} 元/次</div>
-          <el-button type="primary" size="small">立即购买</el-button>
+          <el-button type="primary" size="small">{{ $t('pay.buy_now') }}</el-button>
         </div>
       </div>
       <template #footer>
         <div class="pricing-footer">
-          <p>支付成功后额度自动到账。如有疑问请联系客服。</p>
+          <p>{{ $t('pay.footer_tip') }}</p>
         </div>
       </template>
     </el-dialog>
 
     <!-- 微信支付模拟弹窗 (Native Pay) -->
-    <el-dialog v-model="showPayment" title="微信支付" width="80%" center class="payment-modal" append-to-body>
+    <el-dialog v-model="showPayment" :title="$t('pay.modal_title')" width="80%" center class="payment-modal" append-to-body>
       <div class="payment-content">
         <div class="order-info">
-          <p>订单号：{{ currentOrder.id }}</p>
-          <p>支付金额：<span class="price-text">{{ currentOrder.price }}</span></p>
-          <p>充值条数：{{ currentOrder.quota }} 次</p>
+          <p>{{ $t('pay.order_id') }}：{{ currentOrder.id }}</p>
+          <p>{{ $t('pay.amount') }}：<span class="price-text">{{ currentOrder.price }}</span></p>
+          <p>{{ $t('pay.recharge_quota') }}：{{ currentOrder.quota }}{{ $t('common.times') }}</p>
         </div>
         <div class="qr-box">
           <!-- 模拟二维码 -->
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pay.weixin.qq.com" alt="QR Code" />
-          <p class="qr-tip">请使用微信扫码支付</p>
+          <p class="qr-tip">{{ $t('pay.scan_tip') }}</p>
         </div>
         <div class="test-notice" v-if="currentOrder.isTest">
-          <el-alert title="测试模式: 将在3秒后自动模拟支付成功" type="warning" :closable="false" center />
+          <el-alert :title="$t('pay.test_mode_notice')" type="warning" :closable="false" center />
         </div>
       </div>
     </el-dialog>
@@ -233,8 +233,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { CreditCard } from '@element-plus/icons-vue';
 import { bitable, FieldType } from '@lark-base-open/js-sdk';
+
+const { t, locale } = useI18n();
 import { getAppToken } from '../utils/bitableHelper';
 import { 
   ElMessage, 
@@ -356,12 +359,12 @@ const handleRecharge = async (plan) => {
       });
       const result = await res.json();
       if (result.code === 0) {
-        ElMessage.success('支付成功，配额已到账！');
+        ElMessage.success(t('pay.pay_success'));
         showPayment.value = false;
         fetchQuota(); // 刷新余额
       }
     } catch (e) {
-      ElMessage.error('模拟订单结算失败');
+      ElMessage.error(t('pay.pay_fail'));
     }
   }, 3000);
 };
@@ -379,11 +382,11 @@ const setTestLowQuota = async () => {
     });
     const result = await res.json();
     if (result.code === 0) {
-      ElMessage.info('已成功设置为3次测试额度');
+      ElMessage.info(t('msg.setting_success'));
       fetchQuota();
     }
   } catch (e) {
-    ElMessage.error('设置失败');
+    ElMessage.error(t('msg.setting_fail'));
   }
 };
 
@@ -439,7 +442,7 @@ const initializeTable = async () => {
 
     const selection = await bitable.base.getSelection();
     if (!selection.tableId) {
-      ElMessage.warning('请先选择一个数据表');
+      ElMessage.warning(t('config.select_row_tip'));
       return;
     }
 
@@ -517,7 +520,7 @@ const reinitializeTable = async () => {
   try {
     const selection = await bitable.base.getSelection();
     if (!selection.tableId) {
-      ElMessage.warning('请先选择一个数据表');
+      ElMessage.warning(t('config.select_row_tip'));
       return;
     }
 
@@ -574,7 +577,7 @@ const batchGenerateLinks = async () => {
     }
     
     if (!currentAppToken.value) {
-      ElMessage.error('无法获取 App Token，请确保在飞书多维表格环境中运行');
+      ElMessage.error(t('msg.no_app_token'));
 
       return;
     }
@@ -593,7 +596,8 @@ const batchGenerateLinks = async () => {
         frontend_host: frontendHost,
         sign_mode: config.value.signMode,
         sign_count: config.value.signCount,
-        enable_qrcode: config.value.enableQRCode
+        enable_qrcode: config.value.enableQRCode,
+        lang: locale.value
       })
     });
 
@@ -604,17 +608,17 @@ const batchGenerateLinks = async () => {
       
       if (quota_skipped > 0) {
         ElMessage.warning({
-          message: `成功完成: 生成${success}条, 因余额不足跳过${quota_skipped}条记录。`,
+          message: t('msg.batch_partial_success', { success, quota_skipped }),
           duration: 5000
         });
         showPricing.value = true; // 引导充值
       } else {
-        ElMessage.success(`成功生成 ${success} 条签字链接`);
+        ElMessage.success(t('msg.batch_success', { success }));
       }
       fetchQuota(); // 刷新余额展示
     } else {
       if (result.code === 403) {
-        ElMessage.error('余额不足，请前往充值');
+        ElMessage.error(t('pay.insufficient_quota'));
         showPricing.value = true;
       } else {
         throw new Error(result.msg || '批量生成失败');
@@ -651,7 +655,7 @@ const generateSingleRowLink = async () => {
 
     const selection = await bitable.base.getSelection();
     if (!selection.tableId || !selection.recordId) {
-      ElMessage.warning('请先选择一行记录');
+      ElMessage.warning(t('config.select_row_hint'));
       return;
     }
 
@@ -661,7 +665,7 @@ const generateSingleRowLink = async () => {
     }
     
     if (!currentAppToken.value) {
-      ElMessage.error('无法获取 App Token，请确保在飞书多维表格环境中运行');
+      ElMessage.error(t('msg.no_app_token'));
 
       return;
     }
@@ -681,18 +685,19 @@ const generateSingleRowLink = async () => {
         frontend_host: frontendHost,
         sign_mode: singleRowConfig.value.mode,
         sign_count: singleRowConfig.value.count,
-        enable_qrcode: config.value.enableQRCode
+        enable_qrcode: config.value.enableQRCode,
+        lang: locale.value
       })
     });
 
     const result = await response.json();
 
     if (result.code === 0) {
-      ElMessage.success('签字链接已生成');
+      ElMessage.success(t('msg.single_success'));
       fetchQuota(); // 更新余额
     } else {
       if (result.code === 403) {
-        ElMessage.error('余额不足,请前往充值');
+        ElMessage.error(t('pay.insufficient_quota'));
         showPricing.value = true;
       } else {
         throw new Error(result.msg || '生成失败');

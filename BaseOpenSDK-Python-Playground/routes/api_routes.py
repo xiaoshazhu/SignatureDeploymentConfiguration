@@ -169,7 +169,7 @@ def validate_sign_params(mode, count):
         "count": int(count) if count else 3
     }
 
-def generate_sign_link_for_record(lark_client, app_token, table_id, record_id, frontend_host, sign_mode='或签', sign_count=3, enable_qrcode=True):
+def generate_sign_link_for_record(lark_client, app_token, table_id, record_id, frontend_host, sign_mode='或签', sign_count=3, enable_qrcode=True, lang=None):
     """为单条记录生成签字链接(复用批量生成逻辑)
     
     Args:
@@ -207,6 +207,10 @@ def generate_sign_link_for_record(lark_client, app_token, table_id, record_id, f
     # 加密参数
     encrypted_params = encrypt_url_params(params)
     sign_url = f"{frontend_host}/sign?p={encrypted_params}"
+    
+    # 需求: 追加语言标识, 确保签字页能识别当前展示语言
+    if lang:
+        sign_url += f"&lang={lang}"
     
     # 生成二维码
     qr_token = None
@@ -358,6 +362,7 @@ def generate_single_link():
         sign_mode = data.get('sign_mode', '或签')
         sign_count = data.get('sign_count', 3)
         enable_qrcode = data.get('enable_qrcode', True) # 需求: 获取二维码开关状态
+        lang = data.get('lang') # 需求: 获取语言标识
         
         logger.info(f"收到单行生成请求 - table_id: {table_id}, record_id: {record_id}, tenant_key: {tenant_key}")
         logger.info(f"参数详情 - app_token: {mask_token(app_token)}, frontend_host: {frontend_host}")
@@ -392,7 +397,8 @@ def generate_single_link():
             frontend_host=frontend_host,
             sign_mode=sign_config['mode'],
             sign_count=sign_config['count'],
-            enable_qrcode=enable_qrcode
+            enable_qrcode=enable_qrcode,
+            lang=lang
         )
         
         logger.info(f"单行链接生成成功 - record_id: {record_id}")
@@ -426,6 +432,7 @@ def batch_generate_links():
         table_id = data.get('table_id')
         tenant_key = data.get('tenant_key')
         frontend_host = data.get('frontend_host')
+        lang = data.get('lang') # 需求: 获取语言设置
         
         # 需求8: 获取批量配置参数
         sign_mode = data.get('sign_mode', '或签')
@@ -512,7 +519,8 @@ def batch_generate_links():
                     frontend_host=frontend_host,
                     sign_mode=sign_mode,
                     sign_count=sign_count,
-                    enable_qrcode=enable_qrcode
+                    enable_qrcode=enable_qrcode,
+                    lang=lang
                 )
                 return ('success', record_id)
             except Exception as e:

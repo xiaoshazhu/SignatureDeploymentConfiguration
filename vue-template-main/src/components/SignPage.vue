@@ -1,8 +1,8 @@
 <template>
   <div class="sign-page" :class="{ 'mobile-layout': isMobile, 'landscape': isLandscape }">
     <div class="header" v-if="!isMobile">
-      <h2>电子签名确认</h2>
-      <div class="status-tag" :class="statusClass">{{ statusText }}</div>
+      <h2>{{ $t('sign.title') }}</h2>
+      <div class="status-tag" :class="statusClass">{{ displayStatusText }}</div>
     </div>
 
     <!-- Loading State -->
@@ -13,7 +13,7 @@
     <div v-else class="content">
       <!-- Accordion for Row Data -->
       <el-collapse v-model="activeNames" class="data-accordion" ref="accordionRef">
-        <el-collapse-item title="📄 点击查看详细信息" name="1">
+        <el-collapse-item :title="$t('sign.view_details')" name="1">
           <div class="data-list">
             <div v-for="(value, key) in filteredRowData" :key="key" class="data-item">
               <span class="data-label">{{ key }}:</span>
@@ -26,7 +26,7 @@
       <!-- 需求11: 已签字状态 - 展示签名图片 -->
       <div v-if="statusText === '已签字'" class="signed-section">
         <el-alert
-          title="此记录已完成签字"
+          :title="$t('sign.already_signed_alert')"
           type="success"
           :closable="false"
           show-icon
@@ -41,15 +41,15 @@
               style="width: 200px; height: 150px;"
             >
               <template #error>
-                <div class="image-error">加载失败</div>
+                <div class="image-error">{{ $t('sign.load_fail') }}</div>
               </template>
             </el-image>
-            <p class="image-label">签名 {{ index + 1 }}</p>
+            <p class="image-label">{{ $t('common.success') }} {{ index + 1 }}</p>
           </div>
         </div>
 
         <el-button type="default" size="large" class="submit-btn" @click="closeWindow">
-          关闭
+          {{ $t('common.close') }}
         </el-button>
       </div>
 
@@ -66,7 +66,7 @@
             />
             <!-- 需求: 提示文字 (桌面端/移动端通用, 样式区分) -->
             <div class="signature-tip" v-if="!hasInteracted">
-              请在此处签字
+              {{ $t('sign.sign_here_tip') }}
             </div>
             <!-- 需求13: 开始签字后隐藏提示 -->
             <div class="canvas-placeholder" v-if="!hasInteracted">
@@ -77,10 +77,10 @@
 
         <!-- Submit Actions -->
         <div class="submit-actions" ref="actionsRef">
-          <el-button size="large" class="submit-btn" @click="clear">清除重写</el-button>
+          <el-button size="large" class="submit-btn" @click="clear">{{ $t('sign.clear_btn') }}</el-button>
           
           <el-button type="primary" size="large" class="submit-btn" @click="submit('new')" :loading="submitting">
-            确认提交签名
+            {{ $t('sign.submit_btn') }}
           </el-button>
           
         </div>
@@ -91,8 +91,10 @@
 
 <script setup>
 import { ref, onMounted, computed, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
-// import VueSignaturePad from 'vue-signature-pad'; // 移除本地导入,使用全局注册
+
+const { t, locale } = useI18n();
 
 const signaturePad = ref(null);
 const accordionRef = ref(null);
@@ -111,6 +113,18 @@ const canReuse = ref(false);
 const historyToken = ref('');
 const statusText = ref('待签字');
 const signatureImages = ref([]); // 需求11: 存储已签字的图片列表
+
+// 状态文本国际化映射
+const statusMap = {
+  '待签字': 'sign.status_pending',
+  '已签字': 'sign.status_signed',
+  '签字中': 'sign.status_signing'
+};
+
+const displayStatusText = computed(() => {
+  const key = statusMap[statusText.value] || statusText.value;
+  return t(key);
+});
 
 const filteredRowData = computed(() => {
   const excludedKeys = ['签字二维码', '签字状态', '签字确认', '签字附件'];
@@ -213,31 +227,31 @@ const initPage = async () => {
             return img;
           });
         }
-      } else {
-        throw new Error(result.msg || '获取数据失败');
+        } else {
+        throw new Error(result.msg || t('sign.load_fail'));
       }
     } catch (e) {
       console.error('获取签字信息失败:', e);
       
       // 区分错误类型提供更明确的提示
-      let errorMessage = '获取数据失败';
+      let errorMessage = t('sign.load_fail');
       
       if (e.name === 'TypeError' && (e.message.includes('fetch') || e.message.includes('Failed to fetch'))) {
-        errorMessage = '网络连接失败,请检查网络后重试';
+        errorMessage = t('sign.net_error');
       } else if (e.message && e.message.includes('400')) {
-        errorMessage = '链接参数无效或已被篡改';
+        errorMessage = t('sign.param_error');
       } else if (e.message && (e.message.includes('401') || e.message.includes('403'))) {
-        errorMessage = '链接已过期或无权访问';
+        errorMessage = t('sign.auth_error');
       } else if (e.message && e.message.includes('404')) {
-        errorMessage = '记录不存在或已被删除';
+        errorMessage = t('sign.not_found');
       } else if (e.message && e.message.includes('500')) {
-        errorMessage = '服务器内部错误,请稍后重试';
+        errorMessage = t('sign.server_error');
       } else if (e.message) {
         errorMessage = e.message;
       }
       
       ElMessage.error(errorMessage);
-      statusText.value = '加载失败';
+      statusText.value = t('sign.load_fail');
       
       // 生产环境不使用 Mock 数据
       if (import.meta.env.MODE === 'development') {
@@ -383,7 +397,7 @@ const submit = async (type) => {
   if (type === 'new') {
     const { isEmpty, data } = signaturePad.value.saveSignature();
     if (isEmpty) {
-      ElMessage.warning('请先在画板上签名');
+      ElMessage.warning(t('sign.sign_placeholder_tip'));
       return;
     }
     
@@ -413,7 +427,7 @@ const submit = async (type) => {
 
     const result = await res.json();
     if (result.code === 0) {
-      ElMessage.success('提交成功!');
+      ElMessage.success(t('sign.submit_success'));
       statusText.value = '已签字';
       setTimeout(() => {
         window.close();
@@ -421,7 +435,7 @@ const submit = async (type) => {
     } else {
       // 需求12: 检测是否已被他人签署
       if (result.code === 409 || result.msg.includes('已签')) {
-        ElMessage.warning('此记录已被他人签署,请刷新页面查看');
+        ElMessage.warning(t('sign.already_signed_others'));
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -556,6 +570,21 @@ const handleBegin = () => {
 };
 
 onMounted(() => {
+  // 语言检测逻辑
+  const urlParams = new URLSearchParams(window.location.search);
+  const lang = urlParams.get('lang');
+  if (lang) {
+    if (lang.startsWith('zh')) locale.value = 'zh';
+    else if (lang.startsWith('ja')) locale.value = 'ja';
+    else locale.value = 'en';
+  } else {
+    // 降级使用浏览器语言
+    const browserLang = navigator.language.toLowerCase();
+    if (browserLang.startsWith('zh')) locale.value = 'zh';
+    else if (browserLang.startsWith('ja')) locale.value = 'ja';
+    else locale.value = 'en';
+  }
+
   initPage();
   
   // 检测移动端
