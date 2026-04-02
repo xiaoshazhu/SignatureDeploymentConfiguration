@@ -197,10 +197,11 @@
     <el-dialog v-model="showPricing" title="选择充值套餐" width="90%" class="pricing-dialog" append-to-body>
       <div class="pricing-grid">
         <div v-for="item in pricingPlans" :key="item.quota" class="plan-card" @click="handleRecharge(item)">
-          <div class="plan-quota">{{ item.quota === 30 ? '免费试用' : item.quota + ' 次' }}</div>
+          <div class="plan-quota">{{ item.quota }} 次</div>
+          <div class="plan-tag" v-if="item.isTest">测试包</div>
           <div class="plan-price">{{ item.price }}</div>
-          <div class="plan-desc" v-if="item.quota > 30">约 {{ (parseFloat(item.price.replace('元','')) / item.quota).toFixed(3) }} 元/次</div>
-          <el-button type="primary" size="small" :disabled="item.quota === 30">立即购买</el-button>
+          <div class="plan-desc" v-if="item.quota >= 500">约 {{ (parseFloat(item.price.replace('元','')) / item.quota).toFixed(3) }} 元/次</div>
+          <el-button type="primary" size="small">立即购买</el-button>
         </div>
       </div>
       <template #footer>
@@ -208,6 +209,25 @@
           <p>支付成功后额度自动到账。如有疑问请联系客服。</p>
         </div>
       </template>
+    </el-dialog>
+
+    <!-- 微信支付模拟弹窗 (Native Pay) -->
+    <el-dialog v-model="showPayment" title="微信支付" width="80%" center class="payment-modal" append-to-body>
+      <div class="payment-content">
+        <div class="order-info">
+          <p>订单号：{{ currentOrder.id }}</p>
+          <p>支付金额：<span class="price-text">{{ currentOrder.price }}</span></p>
+          <p>充值条数：{{ currentOrder.quota }} 次</p>
+        </div>
+        <div class="qr-box">
+          <!-- 模拟二维码 -->
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pay.weixin.qq.com" alt="QR Code" />
+          <p class="qr-tip">请使用微信扫码支付</p>
+        </div>
+        <div class="test-notice" v-if="currentOrder.isTest">
+          <el-alert title="测试模式: 将在3秒后自动模拟支付成功" type="warning" :closable="false" center />
+        </div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -267,10 +287,12 @@ const currentAppToken = ref('');
 const tenantKey = ref('');
 
 // 配额信息
-const quotaInfo = ref({ total: 30, used: 0, remaining: 30 });
+const quotaInfo = ref({ total: 0, used: 0, remaining: 0 });
 const showPricing = ref(false);
+const showPayment = ref(false);
+const currentOrder = ref({});
 const pricingPlans = [
-  { quota: 30, price: '免费' },
+  { quota: 10, price: '0.1元', isTest: true },
   { quota: 500, price: '19.9元' },
   { quota: 1000, price: '35.0元' },
   { quota: 5000, price: '119.0元' },
@@ -303,31 +325,46 @@ const fetchQuota = async () => {
   }
 };
 
-// 模拟充值 (Demo用)
+// 支付流程控制 (模拟)
 const handleRecharge = async (plan) => {
-  if (plan.quota === 30) return;
+  showPricing.value = false;
   
-  try {
-    const apiBase = import.meta.env.VITE_API_BASE || '';
-    const res = await fetch(`${apiBase}/quota/recharge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tenant_key: tenantKey.value,
-        package_name: `${plan.quota}次套餐`,
-        added_quota: plan.quota,
-        amount: parseFloat(plan.price.replace('元',''))
-      })
-    });
-    const result = await res.json();
-    if (result.code === 0) {
-      ElMessage.success('充值成功!');
-      fetchQuota();
-      showPricing.value = false;
+  // 1. 生成模拟订单
+  currentOrder.value = {
+    id: 'ORD' + Date.now().toString().slice(-8),
+    price: plan.price,
+    quota: plan.quota,
+    isTest: plan.isTest
+  };
+  
+  // 2. 显示支付二维码
+  showPayment.value = true;
+  
+  // 3. 模拟微信支付成功后的回调 (仅用于Demo展示)
+  // 在真实环境中,后端收到微信回调后更新数据库,前端轮询接口发现余额更新后关闭弹窗
+  setTimeout(async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE || '';
+      const res = await fetch(`${apiBase}/quota/recharge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_key: tenantKey.value,
+          package_name: `${plan.quota}次套餐`,
+          added_quota: plan.quota,
+          amount: parseFloat(plan.price.replace('元',''))
+        })
+      });
+      const result = await res.json();
+      if (result.code === 0) {
+        ElMessage.success('支付成功，配额已到账！');
+        showPayment.value = false;
+        fetchQuota(); // 刷新余额
+      }
+    } catch (e) {
+      ElMessage.error('模拟订单结算失败');
     }
-  } catch (e) {
-    ElMessage.error('支付请求失败');
-  }
+  }, 3000);
 };
 
 // 测试用: 强制设为3次
@@ -799,6 +836,16 @@ onMounted(async () => {
   margin-bottom: 4px;
 }
 
+.plan-tag {
+  font-size: 10px;
+  background-color: #fef0f0;
+  color: #f56c6c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
 .plan-desc {
   font-size: 11px;
   color: #909399;
@@ -809,6 +856,50 @@ onMounted(async () => {
   text-align: center;
   font-size: 12px;
   color: #909399;
+}
+
+/* 支付弹窗样式 */
+.payment-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px;
+}
+
+.order-info {
+  background-color: #f8f8f8;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.order-info p {
+  margin: 4px 0;
+}
+
+.price-text {
+  color: #f56c6c;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.qr-box {
+  padding: 20px;
+  border: 1px solid #efefef;
+  border-radius: 8px;
+}
+
+.qr-box img {
+  width: 150px;
+  height: 150px;
+}
+
+.qr-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #606266;
 }
 
 .action-btn {
