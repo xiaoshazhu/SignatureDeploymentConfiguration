@@ -486,7 +486,17 @@ def batch_generate_links():
             else:
                 records_to_process.append(record)
         
-        logger.info(f"需要处理 {len(records_to_process)} 条记录,跳过 {skip_count} 条")
+        logger.info(f"需要处理 {len(records_to_process)} 条记录,跳过 {skip_count} 条(已有链接)")
+        
+        # 额度限制校验: 如果待处理数超过剩余额度,则截断
+        quota_info = quota_service.get_quota_info(tenant_key)
+        remaining_quota = quota_info.get('remaining', 0)
+        quota_skip_count = 0
+        
+        if len(records_to_process) > remaining_quota:
+            quota_skip_count = len(records_to_process) - remaining_quota
+            logger.warning(f"配额不足: 待处理 {len(records_to_process)} 条, 剩余配额 {remaining_quota} 条。将截断处理。")
+            records_to_process = records_to_process[:remaining_quota]
         
         # 定义线程安全的处理函数
         def process_single_record(record):
@@ -541,19 +551,24 @@ def batch_generate_links():
                         )
 
         
-        logger.info(f"批量生成完成 - 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}")
+        logger.info(f"批量生成完成 - 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}, 配额不足跳过: {quota_skip_count}")
         
         # 扣除相应额度
         if success_count > 0:
             quota_service.consume_quota(tenant_key, success_count)
 
+        msg = "批量生成完成"
+        if quota_skip_count > 0:
+            msg = f"批量生成完成。因配额不足,有{quota_skip_count}条记录被跳过,请充值后续处理。"
+
         return jsonify({
             "code": 0,
-            "msg": "批量生成完成",
+            "msg": msg,
             "data": {
                 "total": total,
                 "success": success_count,
                 "skipped": skip_count,
+                "quota_skipped": quota_skip_count,
                 "failed": error_count
             }
         })
