@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     host: true,
     // 2. 开启 https 选项 [修改点]
-    https: true,
+    https: false,
     // 3. 添加代理配置,转发 API 请求到后端
     proxy: {
       '/api': {
@@ -26,7 +26,7 @@ export default defineConfig({
   plugins: [
     vue(),
     // 3. 将 mkcert() 添加到插件列表中 [修改点]
-    mkcert(),
+    // mkcert(),
     AutoImport({
       resolvers: [ElementPlusResolver()],
     }),

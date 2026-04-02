@@ -374,22 +374,7 @@ def batch_generate_links():
         lark_client = current_app.config['LARK_CLIENT']
         
         # 1. 获取所有记录ID
-        # 使用列出记录API
-        import requests
-        token = lark_client._get_tenant_access_token()
-        list_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.get(list_url, headers=headers, params={"page_size": 500})
-        resp_json = response.json()
-        
-        if resp_json.get("code") != 0:
-            raise Exception(f"获取记录列表失败: {resp_json.get('msg')}")
-        
-        records = resp_json.get("data", {}).get("items", [])
+        records = lark_client.get_records(app_token, table_id)
         total = len(records)
         logger.info(f"获取到 {total} 条记录")
         

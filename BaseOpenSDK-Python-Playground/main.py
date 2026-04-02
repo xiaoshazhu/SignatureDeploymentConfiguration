@@ -33,14 +33,18 @@ def create_app():
 
     app_id = os.getenv("APP_ID")
     app_secret = os.getenv("APP_SECRET")
+    personal_base_token = os.getenv("PERSONAL_BASE_TOKEN")
+    base_app_token = os.getenv("BASE_APP_TOKEN")
     sign_archive_table_id = os.getenv("SIGN_ARCHIVE_TABLE_ID")
     
     # 简单的配置检查
+    if not personal_base_token:
+        logger.warning("PERSONAL_BASE_TOKEN not set in environment variables")
     if not app_id or not app_secret:
-        logger.warning("APP_ID or APP_SECRET not set in environment variables")
+        logger.warning("APP_ID or APP_SECRET not set in environment variables (needed for some non-bitable APIs if any)")
 
     # 初始化服务
-    lark_client = LarkClient(app_id, app_secret)
+    lark_client = LarkClient(app_id, app_secret, personal_base_token, base_app_token)
     sign_service = SignService(lark_client, sign_archive_table_id)
     
     # 注入服务到 app config (修复配置名称)
