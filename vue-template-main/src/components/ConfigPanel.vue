@@ -10,7 +10,6 @@
             <span>套餐额度</span>
           </div>
           <div class="quota-actions">
-            <el-button type="info" size="small" link @click="setTestLowQuota">设为3次</el-button>
             <el-button type="primary" size="small" plain @click="showPricing = true">充值续费</el-button>
           </div>
         </div>
