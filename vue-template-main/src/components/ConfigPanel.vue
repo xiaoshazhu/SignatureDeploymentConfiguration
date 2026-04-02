@@ -600,11 +600,25 @@ const batchGenerateLinks = async () => {
     const result = await response.json();
 
     if (result.code === 0) {
-      const { total, success, skipped, failed } = result.data;
-
-      ElMessage.success(`成功生成 ${success} 条签字链接`);
+      const { total, success, skipped, quota_skipped, failed } = result.data;
+      
+      if (quota_skipped > 0) {
+        ElMessage.warning({
+          message: `成功完成: 生成${success}条, 因余额不足跳过${quota_skipped}条记录。`,
+          duration: 5000
+        });
+        showPricing.value = true; // 引导充值
+      } else {
+        ElMessage.success(`成功生成 ${success} 条签字链接`);
+      }
+      fetchQuota(); // 刷新余额展示
     } else {
-      throw new Error(result.msg || '批量生成失败');
+      if (result.code === 403) {
+        ElMessage.error('余额不足，请前往充值');
+        showPricing.value = true;
+      } else {
+        throw new Error(result.msg || '批量生成失败');
+      }
     }
 
   } catch (error) {
