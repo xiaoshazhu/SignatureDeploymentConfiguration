@@ -9,7 +9,10 @@
             <el-icon><CreditCard /></el-icon>
             <span>套餐额度</span>
           </div>
-          <el-button type="primary" size="small" plain @click="showPricing = true">充值续费</el-button>
+          <div class="quota-actions">
+            <el-button type="info" size="small" link @click="setTestLowQuota">设为3次</el-button>
+            <el-button type="primary" size="small" plain @click="showPricing = true">充值续费</el-button>
+          </div>
         </div>
         <div class="quota-stats">
           <div class="stat-item">
@@ -324,6 +327,27 @@ const handleRecharge = async (plan) => {
     }
   } catch (e) {
     ElMessage.error('支付请求失败');
+  }
+};
+
+// 测试用: 强制设为3次
+const setTestLowQuota = async () => {
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const res = await fetch(`${apiBase}/quota/test/set-low`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_key: tenantKey.value
+      })
+    });
+    const result = await res.json();
+    if (result.code === 0) {
+      ElMessage.info('已成功设置为3次测试额度');
+      fetchQuota();
+    }
+  } catch (e) {
+    ElMessage.error('设置失败');
   }
 };
 
@@ -703,6 +727,12 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.quota-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .quota-title {

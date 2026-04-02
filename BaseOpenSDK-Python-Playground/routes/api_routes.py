@@ -50,6 +50,34 @@ def recharge_quota():
     else:
         return jsonify({"code": 500, "msg": "充值失败"}), 500
 
+@api_bp.route('/quota/test/set-low', methods=['POST'])
+def set_test_low_quota():
+    """测试用: 强制将余额设为3次"""
+    data = request.json
+    tenant_key = data.get('tenant_key')
+    if not tenant_key:
+        return jsonify({"code": 401, "msg": "缺少租户标识"}), 401
+        
+    quota_service = current_app.config['QUOTA_SERVICE']
+    # 强制修改: 总额度改为 (已用 + 3), 这样剩余就是 3
+    info = quota_service.get_quota_info(tenant_key)
+    if not info:
+         return jsonify({"code": 500, "msg": "租户未初始化"}), 500
+         
+    new_total = info['used'] + 3
+    now = datetime.now().isoformat()
+    try:
+        with quota_service._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE tenant_quota SET total_quota = ?, updated_at = ? WHERE tenant_key = ?",
+                (new_total, now, tenant_key)
+            )
+            conn.commit()
+        return jsonify({"code": 0, "msg": "已设为3次余额"})
+    except Exception as e:
+        return jsonify({"code": 500, "msg": str(e)}), 500
+
 @api_bp.route('/sign/info', methods=['GET'])
 def get_sign_info():
     try:
