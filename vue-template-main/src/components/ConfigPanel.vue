@@ -49,13 +49,7 @@
           <span class="form-tip">为签字链接生成二维码</span>
         </el-form-item>
 
-        <el-form-item label="启用历史签名（测试中）">
-          <el-switch 
-            v-model="config.enableHistory"
-            @change="onConfigChange"
-          />
-          <span class="form-tip">允许用户复用之前的签名</span>
-        </el-form-item>
+
 
         <el-divider />
 
@@ -199,7 +193,6 @@ import {
 const config = ref({
   signMode: '或签',
   signCount: 3,
-  enableHistory: true,
   enableQRCode: true
 });
 

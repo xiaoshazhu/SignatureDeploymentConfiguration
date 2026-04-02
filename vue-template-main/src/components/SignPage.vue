@@ -83,17 +83,6 @@
             确认提交签名
           </el-button>
           
-          <el-button 
-            v-if="canReuse" 
-            type="success" 
-            plain 
-            size="large" 
-            class="submit-btn" 
-            @click="submit('reuse')"
-            :loading="submitting"
-          >
-            复用上次签名
-          </el-button>
         </div>
       </div>
     </div>
