@@ -22,23 +22,9 @@ class SignService:
         record = self.lark_client.get_bitable_record(app_token, table_id, record_id)
         fields = record.get("fields", {})
         
-        # 2. 检查历史签名
+        # 2. 检查历史签名 (已按需关闭)
         has_history = False
         history_token = None
-        if user_id and self.sign_archive_table_id:
-            try:
-                # 假设存档表有 User_ID (文本) 和 Signature (附件) 字段
-                filter_cond = f'CurrentValue.[User_ID] = "{user_id}"'
-                history_records = self.lark_client.search_records(app_token, self.sign_archive_table_id, filter_cond)
-                if history_records:
-                    # 取第一条
-                    history_fields = history_records[0].get("fields", {})
-                    attachments = history_fields.get("Signature", [])
-                    if attachments:
-                        has_history = True
-                        history_token = attachments[0].get("file_token")
-            except Exception as e:
-                logger.warning(f"Failed to check history sign: {e}")
 
         # 3. 构造返回数据
         # 使用字段名称直接获取(根据飞书官方文档)
@@ -104,26 +90,16 @@ class SignService:
         
         # 1. 获取 File Token
         file_token = None
-        if sign_type == "reuse":
-            file_token = data.get("file_token")
-            logger.info(f"复用历史签名: {file_token}")
-        else:
-            image_base64 = data.get("image_base64")
-            if not image_base64:
-                raise ValueError("Missing image data")
-            image_bytes = decode_base64_image(image_base64)
-            # 上传签名图片,传入app_token
-            file_token = self.lark_client.upload_image(app_token, image_bytes, 'signature.png')
-            logger.info(f"上传新签名成功: {file_token}")
+        # 历史签名功能已关闭, 统一使用新签名逻辑
+        image_base64 = data.get("image_base64")
+        if not image_base64:
+            raise ValueError("Missing image data")
+        image_bytes = decode_base64_image(image_base64)
+        # 上传签名图片,传入app_token
+        file_token = self.lark_client.upload_image(app_token, image_bytes, 'signature.png')
+        logger.info(f"上传新签名成功: {file_token}")
             
-            # 异步保存到历史 (简单起见这里同步做,或者忽略错误)
-            if user_id and self.sign_archive_table_id:
-                try:
-                    # 检查是否已存在,存在则更新,不存在则新建
-                    # 这里简化为只新建,或者不做 (Demo 目的)
-                    pass 
-                except Exception as e:
-                    logger.warning(f"Failed to save history: {e}")
+        # 历史存档逻辑已关闭
 
         if not file_token:
             raise ValueError("Failed to get file token")
