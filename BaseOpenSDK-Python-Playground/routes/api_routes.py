@@ -15,6 +15,41 @@ def mask_token(token):
         return "None"
     return token[:8] + "..." if len(token) > 8 else token
 
+@api_bp.route('/quota/status', methods=['GET'])
+def get_quota_status():
+    """获取租户配额状态"""
+    tenant_key = request.args.get('tenant_key')
+    if not tenant_key:
+        return jsonify({"code": 401, "msg": "未识别到租户标识"}), 401
+        
+    quota_service = current_app.config['QUOTA_SERVICE']
+    info = quota_service.get_quota_info(tenant_key)
+    
+    if info:
+        return jsonify({"code": 0, "data": info})
+    else:
+        return jsonify({"code": 500, "msg": "获取额度信息失败"}), 500
+
+@api_bp.route('/quota/recharge', methods=['POST'])
+def recharge_quota():
+    """充值配额(模拟)"""
+    data = request.json
+    tenant_key = data.get('tenant_key')
+    package_name = data.get('package_name') # 如 "500次套餐"
+    added_quota = data.get('added_quota')
+    amount = data.get('amount')
+    
+    if not tenant_key or not added_quota:
+        return jsonify({"code": 400, "msg": "参数缺失"}), 400
+        
+    quota_service = current_app.config['QUOTA_SERVICE']
+    success = quota_service.recharge_quota(tenant_key, package_name, added_quota, amount)
+    
+    if success:
+        return jsonify({"code": 0, "msg": "充值成功"})
+    else:
+        return jsonify({"code": 500, "msg": "充值失败"}), 500
+
 @api_bp.route('/sign/info', methods=['GET'])
 def get_sign_info():
     try:
@@ -289,22 +324,29 @@ def generate_single_link():
         app_token = data.get('app_token')
         table_id = data.get('table_id')
         record_id = data.get('record_id')
+        tenant_key = data.get('tenant_key')
         frontend_host = data.get('frontend_host')
         sign_mode = data.get('sign_mode', '或签')
         sign_count = data.get('sign_count', 3)
         enable_qrcode = data.get('enable_qrcode', True) # 需求: 获取二维码开关状态
         
-        logger.info(f"收到单行生成请求 - table_id: {table_id}, record_id: {record_id}, mode: {sign_mode}, count: {sign_count}, enable_qrcode: {enable_qrcode}")
+        logger.info(f"收到单行生成请求 - table_id: {table_id}, record_id: {record_id}, tenant_key: {tenant_key}")
         logger.info(f"参数详情 - app_token: {mask_token(app_token)}, frontend_host: {frontend_host}")
         
-        if not all([app_token, table_id, record_id, frontend_host]):
+        if not all([app_token, table_id, record_id, frontend_host, tenant_key]):
             missing = []
             if not app_token: missing.append('app_token')
             if not table_id: missing.append('table_id')
             if not record_id: missing.append('record_id')
             if not frontend_host: missing.append('frontend_host')
+            if not tenant_key: missing.append('tenant_key')
             logger.error(f"缺少必需参数: {', '.join(missing)}")
-            return jsonify({"code": 400, "msg": f"Missing required parameters: {', '.join(missing)}"}), 400
+            return jsonify({"code": 401, "msg": f"缺少参数或租户标识: {', '.join(missing)}"}), 401
+            
+        # 额度校验
+        quota_service = current_app.config['QUOTA_SERVICE']
+        if not quota_service.check_quota(tenant_key, 1):
+            return jsonify({"code": 403, "msg": "套餐余额不足,请及时充值"}), 403
         
         # 验证签字参数
         sign_config = validate_sign_params(sign_mode, str(sign_count))
@@ -326,12 +368,15 @@ def generate_single_link():
         
         logger.info(f"单行链接生成成功 - record_id: {record_id}")
         
+        # 扣除额度
+        quota_service.consume_quota(tenant_key, 1)
+
         return jsonify({
             "code": 0,
             "msg": "生成成功",
             "data": {
-                "sign_url": result['sign_url'],
-                "qr_token": result['qr_token'],
+                "sign_url": result.get('sign_url'),
+                "qr_token": result.get('qr_token'),
                 "sign_config": sign_config
             }
         })
@@ -350,6 +395,7 @@ def batch_generate_links():
         data = request.json
         app_token = data.get('app_token')
         table_id = data.get('table_id')
+        tenant_key = data.get('tenant_key')
         frontend_host = data.get('frontend_host')
         
         # 需求8: 获取批量配置参数
@@ -357,8 +403,13 @@ def batch_generate_links():
         sign_count = data.get('sign_count', 3)
         enable_qrcode = data.get('enable_qrcode', True) # 需求: 获取二维码开关状态
         
-        if not app_token or not table_id or not frontend_host:
-            return jsonify({"code": 400, "msg": "Missing required parameters"}), 400
+        if not all([app_token, table_id, frontend_host, tenant_key]):
+            return jsonify({"code": 401, "msg": "缺少必需参数或租户标识"}), 401
+            
+        # 额度校验
+        quota_service = current_app.config['QUOTA_SERVICE']
+        if not quota_service.check_quota(tenant_key, 1):
+             return jsonify({"code": 403, "msg": "套餐余额不足,请及时充值"}), 403
         
         logger.info(f"批量生成链接 - app_token: {mask_token(app_token)}, table_id: {table_id}, mode: {sign_mode}, count: {sign_count}, enable_qrcode: {enable_qrcode}")
         
@@ -463,6 +514,10 @@ def batch_generate_links():
         
         logger.info(f"批量生成完成 - 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}")
         
+        # 扣除相应额度
+        if success_count > 0:
+            quota_service.consume_quota(tenant_key, success_count)
+
         return jsonify({
             "code": 0,
             "msg": "批量生成完成",

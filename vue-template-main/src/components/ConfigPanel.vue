@@ -2,6 +2,31 @@
   <div class="config-panel">
 
     <el-form ref="formRef" class="config-form" :model="config" label-position="top">
+      <!-- 配额状态看板 -->
+      <el-card class="quota-card" shadow="never" :body-style="{ padding: '12px 16px' }">
+        <div class="quota-header">
+          <div class="quota-title">
+            <el-icon><CreditCard /></el-icon>
+            <span>套餐额度</span>
+          </div>
+          <el-button type="primary" size="small" plain @click="showPricing = true">充值续费</el-button>
+        </div>
+        <div class="quota-stats">
+          <div class="stat-item">
+            <span class="stat-label">总额度:</span>
+            <span class="stat-value">{{ quotaInfo.total }}次</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">已使用:</span>
+            <span class="stat-value">{{ quotaInfo.used }}次</span>
+          </div>
+          <div class="stat-item highlight">
+            <span class="stat-label">剩余余额:</span>
+            <span class="stat-value">{{ quotaInfo.remaining }}次</span>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 温馨提示 -->
       <el-alert
         title="温馨提示"
@@ -12,7 +37,7 @@
         <template #default>
           <div class="tips-content">
             <p>1、切换数据表格之后,请重新打开插件页面</p>
-            <p>2、当点击操作按钮之后,在操作完成之前请勿改动表格内容</p>
+            <p>2、操作将消耗套餐次数 (1条记录 = 1次)</p>
             <p>3、批量生成只针对未生成签字链接的数据行</p>
           </div>
         </template>
@@ -164,11 +189,29 @@
 
 
     </el-form>
+
+    <!-- 充值续费对话框 -->
+    <el-dialog v-model="showPricing" title="选择充值套餐" width="90%" class="pricing-dialog" append-to-body>
+      <div class="pricing-grid">
+        <div v-for="item in pricingPlans" :key="item.quota" class="plan-card" @click="handleRecharge(item)">
+          <div class="plan-quota">{{ item.quota === 30 ? '免费试用' : item.quota + ' 次' }}</div>
+          <div class="plan-price">{{ item.price }}</div>
+          <div class="plan-desc" v-if="item.quota > 30">约 {{ (parseFloat(item.price.replace('元','')) / item.quota).toFixed(3) }} 元/次</div>
+          <el-button type="primary" size="small" :disabled="item.quota === 30">立即购买</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <div class="pricing-footer">
+          <p>支付成功后额度自动到账。如有疑问请联系客服。</p>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { CreditCard } from '@element-plus/icons-vue';
 import { bitable, FieldType } from '@lark-base-open/js-sdk';
 import { getAppToken } from '../utils/bitableHelper';
 import { 
@@ -218,6 +261,71 @@ const singleRowConfig = ref({
 // 当前表格信息
 const currentTableId = ref('');
 const currentAppToken = ref('');
+const tenantKey = ref('');
+
+// 配额信息
+const quotaInfo = ref({ total: 30, used: 0, remaining: 30 });
+const showPricing = ref(false);
+const pricingPlans = [
+  { quota: 30, price: '免费' },
+  { quota: 500, price: '19.9元' },
+  { quota: 1000, price: '35.0元' },
+  { quota: 5000, price: '119.0元' },
+  { quota: 10000, price: '209.0元' },
+  { quota: 50000, price: '939.0元' },
+  { quota: 100000, price: '1739.0元' },
+  { quota: 200000, price: '3199.0元' }
+];
+
+// 获取配额信息
+const fetchQuota = async () => {
+  if (!tenantKey.value) {
+    try {
+      tenantKey.value = await bitable.bridge.getTenantKey();
+    } catch (e) {
+      console.warn('获取租户标识失败,无法管理配额', e);
+      return;
+    }
+  }
+
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const res = await fetch(`${apiBase}/quota/status?tenant_key=${tenantKey.value}`);
+    const result = await res.json();
+    if (result.code === 0) {
+      quotaInfo.value = result.data;
+    }
+  } catch (e) {
+    console.error('获取额度失败:', e);
+  }
+};
+
+// 模拟充值 (Demo用)
+const handleRecharge = async (plan) => {
+  if (plan.quota === 30) return;
+  
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const res = await fetch(`${apiBase}/quota/recharge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_key: tenantKey.value,
+        package_name: `${plan.quota}次套餐`,
+        added_quota: plan.quota,
+        amount: parseFloat(plan.price.replace('元',''))
+      })
+    });
+    const result = await res.json();
+    if (result.code === 0) {
+      ElMessage.success('充值成功!');
+      fetchQuota();
+      showPricing.value = false;
+    }
+  } catch (e) {
+    ElMessage.error('支付请求失败');
+  }
+};
 
 // 配置变更时保存
 const onConfigChange = () => {
@@ -420,13 +528,12 @@ const batchGenerateLinks = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         app_token: currentAppToken.value,
+        tenant_key: tenantKey.value,
         table_id: selection.tableId,
         frontend_host: frontendHost,
         sign_mode: config.value.signMode,
-        frontend_host: frontendHost,
-        sign_mode: config.value.signMode,
         sign_count: config.value.signCount,
-        enable_qrcode: config.value.enableQRCode // 需求: 传递二维码开关状态
+        enable_qrcode: config.value.enableQRCode
       })
     });
 
@@ -494,23 +601,28 @@ const generateSingleRowLink = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         app_token: currentAppToken.value,
+        tenant_key: tenantKey.value,
         table_id: selection.tableId,
         record_id: selection.recordId,
         frontend_host: frontendHost,
-        sign_mode: singleRowConfig.value.mode,  // 单行配置
-        sign_mode: singleRowConfig.value.mode,  // 单行配置
-        sign_count: singleRowConfig.value.count,  // 单行配置
-        enable_qrcode: config.value.enableQRCode // 需求: 传递二维码开关状态
+        sign_mode: singleRowConfig.value.mode,
+        sign_count: singleRowConfig.value.count,
+        enable_qrcode: config.value.enableQRCode
       })
     });
 
     const result = await response.json();
 
     if (result.code === 0) {
-
       ElMessage.success('签字链接已生成');
+      fetchQuota(); // 更新余额
     } else {
-      throw new Error(result.msg || '生成失败');
+      if (result.code === 403) {
+        ElMessage.error('余额不足,请前往充值');
+        showPricing.value = true;
+      } else {
+        throw new Error(result.msg || '生成失败');
+      }
     }
 
   } catch (error) {
@@ -525,6 +637,7 @@ const generateSingleRowLink = async () => {
 // 组件挂载时检查初始化状态
 onMounted(async () => {
   await checkInitialized();
+  await fetchQuota(); // 获取配额
   // 监听选中记录变化
   await watchSelection();
   
@@ -532,8 +645,6 @@ onMounted(async () => {
   bitable.base.onSelectionChange(async () => {
     await watchSelection();
   });
-  
-  // TODO: 加载保存的配置
 });
 </script>
 
@@ -576,6 +687,96 @@ onMounted(async () => {
 
 .form-tip {
   margin-left: 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 配额卡片样式 */
+.quota-card {
+  margin-bottom: 16px;
+  background-color: #f0f7ff;
+  border: 1px solid #d9ecff;
+}
+
+.quota-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.quota-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  color: #409eff;
+}
+
+.quota-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.stat-item .stat-label {
+  color: #606266;
+  margin-right: 4px;
+}
+
+.stat-item .stat-value {
+  font-weight: 500;
+  color: #303133;
+}
+
+.stat-item.highlight .stat-value {
+  color: #f56c6c;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* 价格表格样式 */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.plan-card {
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.plan-card:hover {
+  border-color: #409eff;
+  background-color: #f0f7ff;
+}
+
+.plan-quota {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.plan-price {
+  font-size: 18px;
+  color: #f56c6c;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.plan-desc {
+  font-size: 11px;
+  color: #909399;
+  margin-bottom: 10px;
+}
+
+.pricing-footer {
+  text-align: center;
   font-size: 12px;
   color: #909399;
 }
