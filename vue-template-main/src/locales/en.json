@@ -99,6 +99,12 @@
     "save_fail": "Save failed",
     "sign_hint": "Please sign first"
   },
+  "feedback": {
+    "title": "Feedback & Support",
+    "desc": "If you encounter any issues, find inappropriate content, or have suggestions, please join our official group to report. We will respond promptly.",
+    "join_group": "Join Support Group",
+    "tip": "You can also contact staff directly in the group"
+  },
   "msg": {
     "batch_success": "Successfully generated {success} signature links",
     "batch_partial_success": "Finished: {success} generated, {quota_skipped} skipped due to low quota.",

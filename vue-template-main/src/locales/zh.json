@@ -99,6 +99,12 @@
     "save_fail": "保存失败",
     "sign_hint": "请先写下您的名字"
   },
+  "feedback": {
+    "title": "反馈与支持",
+    "desc": "如在使用中遇到问题、发现不当内容或有任何建议，欢迎加入官方交流群反馈，我们将及时响应处理。",
+    "join_group": "加入官方交流群",
+    "tip": "您也可以在群内直接联系工作人员"
+  },
   "msg": {
     "batch_success": "成功生成 {success} 条签字链接",
     "batch_partial_success": "成功完成: 生成{success}条, 因余额不足跳过{quota_skipped}条记录。",

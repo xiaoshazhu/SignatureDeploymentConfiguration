@@ -189,6 +189,31 @@
 
       <!-- 单行配置对话框 - 删除,不再需要 -->
 
+      <!-- 反馈与支持 -->
+      <el-card class="config-card feedback-card" shadow="never">
+        <template #header>
+          <div class="feedback-header">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>{{ $t('feedback.title') }}</span>
+          </div>
+        </template>
+        <div class="feedback-content">
+          <p class="feedback-desc">{{ $t('feedback.desc') }}</p>
+          <div class="feedback-actions">
+            <el-button
+              type="primary"
+              plain
+              size="default"
+              class="feedback-btn"
+              @click="openFeedbackGroup"
+            >
+              <el-icon><ChatLineSquare /></el-icon>
+              {{ $t('feedback.join_group') }}
+            </el-button>
+          </div>
+          <p class="feedback-tip">{{ $t('feedback.tip') }}</p>
+        </div>
+      </el-card>
 
     </el-form>
 
@@ -234,7 +259,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { CreditCard } from '@element-plus/icons-vue';
+import { CreditCard, ChatDotRound, ChatLineSquare } from '@element-plus/icons-vue';
 import { bitable, FieldType } from '@lark-base-open/js-sdk';
 
 const { t, locale } = useI18n();
@@ -367,6 +392,11 @@ const handleRecharge = async (plan) => {
       ElMessage.error(t('pay.pay_fail'));
     }
   }, 3000);
+};
+
+// 加入反馈群聊
+const openFeedbackGroup = () => {
+  window.open('https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=9c2s5ba7-0b14-4f90-b6aa-4a1a8834c672', '_blank');
 };
 
 // 测试用: 强制设为3次
@@ -980,5 +1010,47 @@ onMounted(async () => {
 
 .log-message {
   flex: 1;
+}
+
+/* 反馈卡片样式 */
+.feedback-card {
+  margin-top: 8px;
+  border: 1px solid #e6e8eb;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f2f5 100%);
+}
+
+.feedback-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.feedback-content {
+  text-align: center;
+}
+
+.feedback-desc {
+  font-size: 13px;
+  color: #606266;
+  margin: 0 0 14px 0;
+  line-height: 1.6;
+}
+
+.feedback-actions {
+  margin-bottom: 12px;
+}
+
+.feedback-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feedback-tip {
+  font-size: 11px;
+  color: #909399;
+  margin: 0;
 }
 </style>
