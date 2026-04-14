@@ -278,12 +278,37 @@
           </el-form-item>
         </el-form>
         <div class="setup-help">
-          <p>如何获取授权码？</p>
-          <ol>
-            <li>进入多维表格开发者后台</li>
-            <li>在「个人授权码」栏目生成或复制</li>
-            <li>确保授权码具有该表格的编辑权限</li>
-          </ol>
+          <h3>{{ $t('config.setup_help_title') }}</h3>
+          <div class="setup-steps">
+            <div class="step-item">
+              <span class="step-num">1</span>
+              <p>{{ $t('config.setup_step_1') }}</p>
+              <div class="step-img-box">
+                <img src="/feishu001.jpeg" alt="Step 1" @click="previewImage('/feishu001.jpeg')">
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">2</span>
+              <p>{{ $t('config.setup_step_2') }}</p>
+              <div class="step-img-box">
+                <img src="/feishu002.jpeg" alt="Step 2" @click="previewImage('/feishu002.jpeg')">
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">3</span>
+              <p>{{ $t('config.setup_step_3') }}</p>
+              <div class="step-img-box">
+                <img src="/feishu003.jpeg" alt="Step 3" @click="previewImage('/feishu003.jpeg')">
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-num">4</span>
+              <p>{{ $t('config.setup_step_4') }}</p>
+              <div class="step-img-box">
+                <img src="/feishu004.jpeg" alt="Step 4" @click="previewImage('/feishu004.jpeg')">
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -301,26 +326,23 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CreditCard, ChatDotRound, ChatLineSquare, Setting } from '@element-plus/icons-vue';
 import { bitable, FieldType } from '@lark-base-open/js-sdk';
+import { ElMessage, ElMessageBox } from 'element-plus';
 
 const { t, locale } = useI18n();
 import { getAppToken } from '../utils/bitableHelper';
-import { 
-  ElMessage, 
-  ElMessageBox,
-  ElForm,
-  ElFormItem,
-  ElCard,
-  ElRadioGroup,
-  ElRadio,
-  ElInputNumber,
-  ElSwitch,
-  ElDivider,
-  ElCollapse,
-  ElCollapseItem,
-  ElButton,
-  ElAlert,
-  ElDialog
-} from 'element-plus';
+
+// 图片预览相关
+const previewImage = (url) => {
+  ElMessageBox.alert(
+    `<img src="${url}" style="width: 100%; max-height: 80vh; object-fit: contain;" />`,
+    t('config.setup_help_title'),
+    {
+      dangerouslyUseHTMLString: true,
+      customClass: 'image-preview-dialog',
+      confirmButtonText: t('common.confirm')
+    }
+  );
+};
 
 // 配置数据
 const config = ref({
@@ -583,7 +605,6 @@ const initializeTable = async () => {
   try {
     initializing.value = true;
 
-
     const selection = await bitable.base.getSelection();
     if (!selection.tableId) {
       ElMessage.warning(t('config.select_row_tip'));
@@ -635,7 +656,6 @@ const initializeTable = async () => {
     // 创建字段
     for (const field of fieldsToCreate) {
       await table.addField(field);
-
     }
 
     if (fieldsToCreate.length === 0) {
@@ -649,10 +669,8 @@ const initializeTable = async () => {
     initialQRCodeState.value = config.value.enableQRCode;
     qrcodeChanged.value = false;
 
-
   } catch (error) {
     console.error('初始化失败:', error);
-
     ElMessage.error(`初始化失败: ${error.message}`);
   } finally {
     initializing.value = false;
@@ -708,7 +726,6 @@ const batchGenerateLinks = async () => {
   try {
     generating.value = true;
 
-
     const selection = await bitable.base.getSelection();
     if (!selection.tableId) {
       ElMessage.warning('请先选择一个数据表');
@@ -722,7 +739,6 @@ const batchGenerateLinks = async () => {
     
     if (!currentAppToken.value) {
       ElMessage.error(t('msg.no_app_token'));
-
       return;
     }
     
@@ -771,7 +787,6 @@ const batchGenerateLinks = async () => {
 
   } catch (error) {
     console.error('批量生成失败:', error);
-
     ElMessage.error(`批量生成失败: ${error.message}`);
   } finally {
     generating.value = false;
@@ -796,7 +811,6 @@ const generateSingleRowLink = async () => {
   try {
     generatingSingle.value = true;
 
-
     const selection = await bitable.base.getSelection();
     if (!selection.tableId || !selection.recordId) {
       ElMessage.warning(t('config.select_row_hint'));
@@ -810,7 +824,6 @@ const generateSingleRowLink = async () => {
     
     if (!currentAppToken.value) {
       ElMessage.error(t('msg.no_app_token'));
-
       return;
     }
 
@@ -850,7 +863,6 @@ const generateSingleRowLink = async () => {
 
   } catch (error) {
     console.error('生成单行链接失败:', error);
-
     ElMessage.error(`生成失败: ${error.message}`);
   } finally {
     generatingSingle.value = false;
@@ -1081,54 +1093,80 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.log-list {
-  max-height: 300px;
+/* 系统配置教程样式 */
+.setup-content {
+  max-height: 60vh;
   overflow-y: auto;
+  padding-right: 8px;
 }
 
-.log-item {
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-  font-size: 13px;
+.setup-help {
+  margin-top: 24px;
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+.setup-help h3 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: #303133;
+}
+
+.setup-steps {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.log-item.info {
-  background-color: #f4f4f5;
-  color: #606266;
+.step-item {
+  position: relative;
+  padding-left: 32px;
 }
 
-.log-item.success {
-  background-color: #f0f9ff;
-  color: #67c23a;
-}
-
-.log-item.warning {
-  background-color: #fdf6ec;
-  color: #e6a23c;
-}
-
-.log-item.error {
-  background-color: #fef0f0;
-  color: #f56c6c;
-}
-
-.log-time {
-  flex-shrink: 0;
-  color: #909399;
+.step-num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  background-color: #409eff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
+  font-weight: bold;
 }
 
-.log-message {
-  flex: 1;
+.step-item p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #606266;
+  line-height: 24px;
+}
+
+.step-img-box {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: all 0.3s;
+}
+
+.step-img-box:hover {
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  border-color: #409eff;
+}
+
+.step-img-box img {
+  width: 100%;
+  display: block;
+}
+
+:deep(.image-preview-dialog) {
+  width: 90% !important;
+  max-width: 800px;
 }
 
 /* 反馈卡片样式 */
