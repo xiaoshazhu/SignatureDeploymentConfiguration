@@ -411,7 +411,6 @@ const saveToken = async () => {
 };
 
 const pricingPlans = [
-  { quota: 10, price: '0.1元', isTest: true },
   { quota: 500, price: '19.9元' },
   { quota: 1000, price: '35.0元' },
   { quota: 5000, price: '119.0元' },
