@@ -38,6 +38,21 @@ class QuotaService:
                         created_at TIMESTAMP
                     )
                 ''')
+                # 记录支付订单
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS payment_orders (
+                        order_id TEXT PRIMARY KEY,
+                        tenant_key TEXT,
+                        package_id TEXT,
+                        pay_type TEXT,
+                        amount REAL,
+                        added_quota INTEGER,
+                        status TEXT,
+                        transaction_id TEXT,
+                        created_at TIMESTAMP,
+                        updated_at TIMESTAMP
+                    )
+                ''')
                 conn.commit()
             logger.info("Quota database initialized")
         except Exception as e:
@@ -150,3 +165,66 @@ class QuotaService:
         except Exception as e:
             logger.error(f"Failed to recharge quota for {tenant_key}: {e}")
             return False
+
+    def create_payment_order(self, order_id, tenant_key, package_id, pay_type, amount, added_quota):
+        """创建待支付订单"""
+        now = datetime.now().isoformat()
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO payment_orders (order_id, tenant_key, package_id, pay_type, amount, added_quota, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (order_id, tenant_key, package_id, pay_type, amount, added_quota, 'PENDING', now, now)
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create payment order {order_id}: {e}")
+            return False
+
+    def update_payment_status(self, order_id, status, transaction_id=None):
+        """更新订单状态,如果成功则自动充值"""
+        now = datetime.now().isoformat()
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                # 先查询订单信息
+                cursor.execute("SELECT tenant_key, status, added_quota, amount, package_id FROM payment_orders WHERE order_id = ?", (order_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                
+                tenant_key, old_status, added_quota, amount, package_id = row
+                
+                # 如果已经是成功状态,则不重复处理
+                if old_status == 'SUCCESS':
+                    return True
+                
+                # 更新订单状态
+                cursor.execute(
+                    "UPDATE payment_orders SET status = ?, transaction_id = ?, updated_at = ? WHERE order_id = ?",
+                    (status, transaction_id, now, order_id)
+                )
+                conn.commit()
+                
+                # 如果状态变为成功,则增加配额
+                if status == 'SUCCESS':
+                    package_name = f"套餐_{package_id}"
+                    return self.recharge_quota(tenant_key, package_name, added_quota, amount)
+                
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update payment status for {order_id}: {e}")
+            return False
+
+    def get_payment_status(self, order_id):
+        """查询订单状态"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT status FROM payment_orders WHERE order_id = ?", (order_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.error(f"Failed to get payment status for {order_id}: {e}")
+            return None

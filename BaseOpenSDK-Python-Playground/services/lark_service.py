@@ -1,5 +1,6 @@
 import logging
 import io
+import os
 from baseopensdk import BaseClient
 from baseopensdk.api.base.v1 import *
 from baseopensdk.api.drive.v1 import *
@@ -19,19 +20,48 @@ class LarkClient:
     def __init__(self, app_id, app_secret, personal_base_token=None, app_token=None):
         self.app_id = app_id
         self.app_secret = app_secret
-        self.personal_base_token = personal_base_token
         self.app_token = app_token or "" # 默认 app_token
         
-        # 初始化 BaseClient
+        # 优先从本地文件加载已保存的授权码
+        self.token_file = ".personal_base_token"
+        if not personal_base_token and os.path.exists(self.token_file):
+            try:
+                with open(self.token_file, 'r') as f:
+                    personal_base_token = f.read().strip()
+                logger.info("Loaded personal_base_token from local file")
+            except Exception as e:
+                logger.error(f"Failed to load token from file: {e}")
+
+        self.personal_base_token = personal_base_token
+        self._init_client()
+
+    def _init_client(self):
+        """初始化或重新初始化 BaseClient"""
         builder = BaseClient.builder()
-        if personal_base_token:
-            builder.personal_base_token(personal_base_token)
+        if self.personal_base_token:
+            builder.personal_base_token(self.personal_base_token)
         
         # 必须设置 app_token,否则内部构建URL会报错
         builder.app_token(self.app_token)
             
         self.client = builder.build()
-        logger.info("LarkClient initialized with baseopensdk")
+        logger.info(f"LarkClient initialized (Token present: {bool(self.personal_base_token)})")
+
+    def set_personal_base_token(self, token):
+        """动态设置并保存授权码"""
+        if not token:
+            return
+        
+        self.personal_base_token = token
+        # 保存到本地文件以供下次启动使用
+        try:
+            with open(self.token_file, 'w') as f:
+                f.write(token)
+            logger.info("Saved personal_base_token to local file")
+        except Exception as e:
+            logger.error(f"Failed to save token to file: {e}")
+            
+        self._init_client()
 
     def _get_tenant_access_token(self):
         """兼容旧代码,如果需要的话可以返回None或抛错。目前SDK自动处理鉴权"""

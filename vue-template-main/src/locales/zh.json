@@ -16,7 +16,9 @@
     "warning": "警告",
     "info": "信息",
     "loading": "加载中...",
-    "close": "关闭"
+    "close": "关闭",
+    "confirm": "确定",
+    "cancel": "取消"
   },
   "config": {
     "batch_title": "批量配置",
@@ -28,6 +30,9 @@
     "qrcode_tip": "为签字链接生成二维码",
     "init_btn": "初始化表格结构",
     "reinit_btn": "重新初始化表格结构",
+    "setup_title": "系统初始化配置",
+    "setup_tip": "首次使用需配置飞书个人授权码 (Personal Base Token),以获得操作多维表格的权限。",
+    "token_label": "个人授权码",
     "initializing": "正在初始化...",
     "init_tip_first": "首次使用需要初始化表格,将自动创建必要的字段",
     "init_confirm_msg": "确定要重新初始化表格结构吗?",

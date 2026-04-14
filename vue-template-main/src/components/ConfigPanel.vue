@@ -10,6 +10,9 @@
             <span>{{ $t('common.quota_title') }}</span>
           </div>
           <div class="quota-actions">
+            <el-button size="small" circle @click="showSetup = true">
+              <el-icon><Setting /></el-icon>
+            </el-button>
             <el-button type="primary" size="small" plain @click="showPricing = true">{{ $t('common.recharge_btn') }}</el-button>
           </div>
         </div>
@@ -235,7 +238,7 @@
       </template>
     </el-dialog>
 
-    <!-- 微信支付模拟弹窗 (Native Pay) -->
+    <!-- 微信支付真实弹窗 (Native Pay) -->
     <el-dialog v-model="showPayment" :title="$t('pay.modal_title')" width="80%" center class="payment-modal" append-to-body>
       <div class="payment-content">
         <div class="order-info">
@@ -244,22 +247,59 @@
           <p>{{ $t('pay.recharge_quota') }}：{{ currentOrder.quota }}{{ $t('common.times') }}</p>
         </div>
         <div class="qr-box">
-          <!-- 模拟二维码 -->
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pay.weixin.qq.com" alt="QR Code" />
+          <!-- 动态生成二维码 -->
+          <img 
+            v-if="currentOrder.code_url"
+            :src="`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentOrder.code_url)}`" 
+            alt="WeChat Pay QR" 
+          />
           <p class="qr-tip">{{ $t('pay.scan_tip') }}</p>
         </div>
-        <div class="test-notice" v-if="currentOrder.isTest">
-          <el-alert :title="$t('pay.test_mode_notice')" type="warning" :closable="false" center />
+      </div>
+    </el-dialog>
+    
+    <!-- 系统配置对话框 -->
+    <el-dialog v-model="showSetup" :title="$t('config.setup_title')" width="90%" center :close-on-click-modal="false" append-to-body>
+      <div class="setup-content">
+        <el-alert
+          :title="$t('config.setup_tip')"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 16px;"
+        />
+        <el-form label-position="top">
+          <el-form-item :label="$t('config.token_label')">
+            <el-input 
+              v-model="tempToken" 
+              type="password" 
+              show-password 
+              placeholder="请输入飞书个人授权码 (Personal Base Token)" 
+            />
+          </el-form-item>
+        </el-form>
+        <div class="setup-help">
+          <p>如何获取授权码？</p>
+          <ol>
+            <li>进入多维表格开发者后台</li>
+            <li>在「个人授权码」栏目生成或复制</li>
+            <li>确保授权码具有该表格的编辑权限</li>
+          </ol>
         </div>
       </div>
+      <template #footer>
+        <el-button @click="showSetup = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="savingToken" @click="saveToken">
+          {{ $t('common.confirm') }}
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { CreditCard, ChatDotRound, ChatLineSquare } from '@element-plus/icons-vue';
+import { CreditCard, ChatDotRound, ChatLineSquare, Setting } from '@element-plus/icons-vue';
 import { bitable, FieldType } from '@lark-base-open/js-sdk';
 
 const { t, locale } = useI18n();
@@ -318,6 +358,58 @@ const quotaInfo = ref({ total: 0, used: 0, remaining: 0 });
 const showPricing = ref(false);
 const showPayment = ref(false);
 const currentOrder = ref({});
+const pollingTimer = ref(null);
+
+// 系统配置相关
+const showSetup = ref(false);
+const tempToken = ref('');
+const savingToken = ref(false);
+
+const checkConfig = async () => {
+  try {
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const res = await fetch(`${apiBase}/config/check`);
+    const result = await res.json();
+    if (result.code === 0 && !result.data.token_set) {
+      showSetup.value = true;
+    }
+  } catch (e) {
+    console.error('检查配置失败:', e);
+  }
+};
+
+const saveToken = async () => {
+  if (!tempToken.value) {
+    ElMessage.warning('请输入有效的授权码');
+    return;
+  }
+  
+  try {
+    savingToken.value = true;
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const res = await fetch(`${apiBase}/config/set-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personal_base_token: tempToken.value })
+    });
+    const result = await res.json();
+    if (result.code === 0) {
+      ElMessage.success('配置保存成功');
+      showSetup.value = false;
+      tempToken.value = '';
+      // 配置保存后刷新其他状态
+      fetchQuota();
+      checkInitialized();
+    } else {
+      ElMessage.error(result.msg || '保存失败');
+    }
+  } catch (e) {
+    ElMessage.error('网络连接失败');
+  } finally {
+    savingToken.value = false;
+  }
+};
+
 const pricingPlans = [
   { quota: 10, price: '0.1元', isTest: true },
   { quota: 500, price: '19.9元' },
@@ -352,46 +444,69 @@ const fetchQuota = async () => {
   }
 };
 
-// 支付流程控制 (模拟)
-const handleRecharge = async (plan) => {
-  showPricing.value = false;
+// 轮询订单状态
+const startPolling = (orderId) => {
+  if (pollingTimer.value) clearInterval(pollingTimer.value);
   
-  // 1. 生成模拟订单
-  currentOrder.value = {
-    id: 'ORD' + Date.now().toString().slice(-8),
-    price: plan.price,
-    quota: plan.quota,
-    isTest: plan.isTest
-  };
-  
-  // 2. 显示支付二维码
-  showPayment.value = true;
-  
-  // 3. 模拟微信支付成功后的回调 (仅用于Demo展示)
-  // 在真实环境中,后端收到微信回调后更新数据库,前端轮询接口发现余额更新后关闭弹窗
-  setTimeout(async () => {
+  const apiBase = import.meta.env.VITE_API_BASE || '';
+  pollingTimer.value = setInterval(async () => {
     try {
-      const apiBase = import.meta.env.VITE_API_BASE || '';
-      const res = await fetch(`${apiBase}/quota/recharge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_key: tenantKey.value,
-          package_name: `${plan.quota}次套餐`,
-          added_quota: plan.quota,
-          amount: parseFloat(plan.price.replace('元',''))
-        })
-      });
+      const res = await fetch(`${apiBase}/pay/status/${orderId}`);
       const result = await res.json();
-      if (result.code === 0) {
+      if (result.code === 0 && result.status === 'SUCCESS') {
+        clearInterval(pollingTimer.value);
+        pollingTimer.value = null;
         ElMessage.success(t('pay.pay_success'));
         showPayment.value = false;
         fetchQuota(); // 刷新余额
       }
     } catch (e) {
-      ElMessage.error(t('pay.pay_fail'));
+      console.error('轮询订单状态失败:', e);
     }
   }, 3000);
+};
+
+// 真实支付流程
+const handleRecharge = async (plan) => {
+  try {
+    showPricing.value = false;
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    
+    // 1. 调用后端创建真实订单
+    const res = await fetch(`${apiBase}/pay/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_key: tenantKey.value,
+        package_id: `plan_${plan.quota}`, // 使用额度作为标识
+        quota: plan.quota,
+        amount: parseFloat(plan.price.replace('元','')),
+        pay_type: 'wechat'
+      })
+    });
+    
+    const result = await res.json();
+    if (result.code === 0) {
+      // 2. 这里的 data 包含 order_id 和 code_url
+      currentOrder.value = {
+        id: result.data.order_id,
+        price: plan.price,
+        quota: plan.quota,
+        code_url: result.data.code_url
+      };
+      
+      // 3. 显示支付弹窗
+      showPayment.value = true;
+      
+      // 4. 开始轮询状态
+      startPolling(result.data.order_id);
+    } else {
+      ElMessage.error(result.msg || '下单失败');
+    }
+  } catch (e) {
+    console.error('充值请求失败:', e);
+    ElMessage.error('网络错误,请重试');
+  }
 };
 
 // 加入反馈群聊
@@ -745,6 +860,7 @@ const generateSingleRowLink = async () => {
 
 // 组件挂载时检查初始化状态
 onMounted(async () => {
+  await checkConfig(); // 检查是否有授权码
   await checkInitialized();
   await fetchQuota(); // 获取配额
   // 监听选中记录变化
@@ -754,6 +870,10 @@ onMounted(async () => {
   bitable.base.onSelectionChange(async () => {
     await watchSelection();
   });
+});
+
+onUnmounted(() => {
+  if (pollingTimer.value) clearInterval(pollingTimer.value);
 });
 </script>
 

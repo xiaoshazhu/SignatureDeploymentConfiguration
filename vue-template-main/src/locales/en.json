@@ -16,7 +16,9 @@
     "warning": "Warning",
     "info": "Info",
     "loading": "Loading...",
-    "close": "Close"
+    "close": "Close",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   },
   "config": {
     "batch_title": "Batch Configuration",
@@ -26,6 +28,9 @@
     "sign_count": "Signatories Count",
     "enable_qrcode": "Enable QR Code",
     "qrcode_tip": "Generate QR code for links",
+    "setup_title": "System Initialization",
+    "setup_tip": "For first-time use, please configure your Personal Base Token to grant the plugin access to your Bitable.",
+    "token_label": "Personal Base Token",
     "init_btn": "Initialize Table Structure",
     "reinit_btn": "Reinitialize Table Structure",
     "initializing": "Initializing...",

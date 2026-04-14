@@ -4,6 +4,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from datetime import datetime
+from uuid import uuid4
 from utils.crypto_utils import encrypt_url_params, decrypt_url_params
 
 api_bp = Blueprint('api', __name__)
@@ -15,6 +16,30 @@ def mask_token(token):
     if not token:
         return "None"
     return token[:8] + "..." if len(token) > 8 else token
+
+@api_bp.route('/config/set-token', methods=['POST'])
+def set_personal_base_token():
+    """动态设置个人授权码 (Personal Base Token)"""
+    data = request.json
+    token = data.get('personal_base_token')
+    if not token:
+        return jsonify({"code": 400, "msg": "授权码不能为空"}), 400
+    
+    lark_client = current_app.config['LARK_CLIENT']
+    lark_client.set_personal_base_token(token)
+    
+    return jsonify({"code": 0, "msg": "授权码设置成功并已持久化"})
+
+@api_bp.route('/config/check', methods=['GET'])
+def check_config():
+    """检查后台配置状态"""
+    lark_client = current_app.config['LARK_CLIENT']
+    return jsonify({
+        "code": 0,
+        "data": {
+            "token_set": bool(lark_client.personal_base_token)
+        }
+    })
 
 @api_bp.route('/quota/status', methods=['GET'])
 def get_quota_status():
@@ -599,4 +624,119 @@ def proxy_image():
         return Response(image_content, mimetype='image/png')
     except Exception as e:
         logger.error(f"Proxy image failed: {e}")
+        return jsonify({"code": 500, "msg": str(e)}), 500
+
+# === 支付相关接口 ===
+
+@api_bp.route('/pay/create', methods=['POST'])
+def create_pay_order():
+    """创建支付订单"""
+    try:
+        data = request.json
+        tenant_key = data.get('tenant_key')
+        package_id = data.get('package_id')
+        pay_type = data.get('pay_type', 'wechat')
+        
+        # 允许从前端直接传金额和额度 (灵活性更高)
+        amount = data.get('amount')
+        added_quota = data.get('quota')
+        
+        if not tenant_key or (not package_id and not amount):
+            return jsonify({"code": 400, "msg": "参数缺失"}), 400
+            
+        # 如果没有传金额和额度,则使用默认配置
+        if not amount or not added_quota:
+            packages = {
+                'p1': {'amount': 9.9, 'quota': 100, 'name': '基础套餐'},
+                'p2': {'amount': 19.9, 'quota': 300, 'name': '进阶套餐'},
+                'p3': {'amount': 29.9, 'quota': 500, 'name': '高级套餐'}
+            }
+            plan = packages.get(package_id)
+            if not plan:
+                return jsonify({"code": 400, "msg": "无效的套餐类型"}), 400
+            amount = plan['amount']
+            added_quota = plan['quota']
+            plan_name = plan['name']
+        else:
+            plan_name = f"{added_quota}次套餐"
+            
+        order_id = f"ORDER_{datetime.now().strftime('%Y%m%d%H%M%S')}_{str(uuid4())[:8]}"
+        
+        quota_service = current_app.config['QUOTA_SERVICE']
+        wechat_pay_service = current_app.config['WECHAT_PAY_SERVICE']
+        
+        # 1. 在本地数据库创建 PENDING 订单
+        success = quota_service.create_payment_order(
+            order_id, tenant_key, package_id, pay_type, amount, added_quota
+        )
+        
+        if not success:
+            return jsonify({"code": 500, "msg": "创建订单数据失败"}), 500
+            
+        # 2. 调用支付平台接口获取二维码链接
+        if pay_type == 'wechat':
+            code_url = wechat_pay_service.create_native_order(
+                order_id, amount, f"电子签名插件-{plan_name}"
+            )
+            if not code_url:
+                return jsonify({"code": 500, "msg": "对接微信支付失败,请检查后台配置(如私钥文件)"}), 500
+                
+            return jsonify({
+                "code": 0,
+                "data": {
+                    "order_id": order_id,
+                    "code_url": code_url
+                }
+            })
+        else:
+            return jsonify({"code": 400, "msg": "目前仅支持微信支付"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in create_pay_order: {e}")
+        return jsonify({"code": 500, "msg": str(e)}), 500
+
+@api_bp.route('/pay/wechat-notify', methods=['POST'])
+def wechat_notify():
+    """微信支付回调"""
+    # 微信支付要求返回 200 或其他指定格式
+    try:
+        headers = dict(request.headers)
+        body = request.data.decode('utf-8')
+        
+        wechat_pay_service = current_app.config['WECHAT_PAY_SERVICE']
+        quota_service = current_app.config['QUOTA_SERVICE']
+        
+        resource = wechat_pay_service.verify_callback(headers, body)
+        if resource:
+            order_id = resource.get('out_trade_no')
+            transaction_id = resource.get('transaction_id')
+            trade_state = resource.get('trade_state')
+            
+            if trade_state == 'SUCCESS':
+                # 更新订单状态并充值
+                quota_service.update_payment_status(order_id, 'SUCCESS', transaction_id)
+                logger.info(f"Payment SUCCESS confirmed for order {order_id}")
+            
+            return jsonify({"code": "SUCCESS", "message": "OK"}), 200
+        else:
+            logger.warning("WeChat callback verification failed")
+            return jsonify({"code": "FAIL", "message": "Sign Error"}), 400
+            
+    except Exception as e:
+        logger.error(f"Error in wechat_notify: {e}")
+        return jsonify({"code": "FAIL", "message": str(e)}), 500
+
+@api_bp.route('/pay/status/<order_id>', methods=['GET'])
+def get_payment_status(order_id):
+    """查询支付订单状态"""
+    try:
+        quota_service = current_app.config['QUOTA_SERVICE']
+        status = quota_service.get_payment_status(order_id)
+        
+        if status:
+            return jsonify({"code": 0, "status": status})
+        else:
+            return jsonify({"code": 404, "msg": "订单不存在"}), 404
+    except Exception as e:
+        logger.error(f"Error in get_payment_status: {e}")
         return jsonify({"code": 500, "msg": str(e)}), 500
