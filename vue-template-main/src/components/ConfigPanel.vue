@@ -10,10 +10,12 @@
             <span>{{ $t('common.quota_title') }}</span>
           </div>
           <div class="quota-actions">
-            <el-button size="small" @click="showSetup = true">
-              <el-icon><Setting /></el-icon>
-              <span>{{ $t('common.setup_btn') }}</span>
-            </el-button>
+            <el-badge :is-dot="!isTokenSet" type="danger">
+              <el-button size="small" :type="!isTokenSet ? 'danger' : ''" :plain="isTokenSet" @click="showSetup = true">
+                <el-icon><Setting /></el-icon>
+                <span>{{ $t('common.setup_btn') }}</span>
+              </el-button>
+            </el-badge>
             <el-button type="primary" size="small" plain @click="showPricing = true">{{ $t('common.recharge_btn') }}</el-button>
           </div>
         </div>
@@ -36,12 +38,13 @@
       <!-- 温馨提示 -->
       <el-alert
         :title="$t('common.tips_title')"
-        type="info"
+        :type="isTokenSet ? 'info' : 'error'"
         :closable="false"
         class="compact-tips"
       >
         <template #default>
           <div class="tips-content">
+            <p v-if="!isTokenSet" class="tip-mandatory">{{ $t('common.tip_setup_mandatory') }}</p>
             <p>1、{{ $t('common.tip_switch_table') }}</p>
             <p>2、{{ $t('common.tip_consume_quota') }}</p>
             <p>3、{{ $t('common.tip_batch_new_only') }}</p>
@@ -88,16 +91,20 @@
         <div class="action-section">
           <!-- 未初始化时显示初始化按钮 -->
           <template v-if="!isInitialized">
-            <el-button 
-              type="primary" 
-              size="large" 
-              :loading="initializing"
-              @click="initializeTable"
-              class="action-btn"
-            >
-              {{ initializing ? $t('config.initializing') : $t('config.init_btn') }}
-            </el-button>
-            <p class="tip-text">{{ $t('config.init_tip_first') }}</p>
+            <el-tooltip :content="$t('config.init_disabled_tip')" :disabled="isTokenSet" placement="top">
+              <el-button 
+                type="primary" 
+                size="large" 
+                :loading="initializing"
+                :disabled="!isTokenSet"
+                @click="initializeTable"
+                class="action-btn"
+              >
+                {{ initializing ? $t('config.initializing') : $t('config.init_btn') }}
+              </el-button>
+            </el-tooltip>
+            <p class="tip-text" v-if="!isTokenSet" style="color: #f56c6c;">🔒 {{ $t('config.init_disabled_tip') }}</p>
+            <p class="tip-text" v-else>{{ $t('config.init_tip_first') }}</p>
           </template>
 
           <!-- 已初始化后显示批量生成 -->
@@ -387,14 +394,18 @@ const pollingTimer = ref(null);
 const showSetup = ref(false);
 const tempToken = ref('');
 const savingToken = ref(false);
+const isTokenSet = ref(false);
 
 const checkConfig = async () => {
   try {
     const apiBase = import.meta.env.VITE_API_BASE || '';
     const res = await fetch(`${apiBase}/config/check`);
     const result = await res.json();
-    if (result.code === 0 && !result.data.token_set) {
-      showSetup.value = true;
+    if (result.code === 0) {
+      isTokenSet.value = !!result.data.token_set;
+      if (!result.data.token_set) {
+        showSetup.value = true;
+      }
     }
   } catch (e) {
     console.error('检查配置失败:', e);
@@ -420,6 +431,7 @@ const saveToken = async () => {
       ElMessage.success('配置保存成功');
       showSetup.value = false;
       tempToken.value = '';
+      isTokenSet.value = true;
       // 配置保存后刷新其他状态
       fetchQuota();
       checkInitialized();
@@ -918,6 +930,13 @@ onUnmounted(() => {
 .tips-content p {
   margin: 2px 0;
   font-size: 12px;
+}
+
+.tip-mandatory {
+  font-weight: bold;
+  color: #f56c6c;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
 }
 
 .config-card,
