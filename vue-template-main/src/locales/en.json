@@ -6,6 +6,7 @@
     "tip_batch_new_only": "Batch generation only targets records without links.",
     "quota_title": "Package Quota",
     "recharge_btn": "Recharge",
+    "setup_btn": "Token Config",
     "total_quota": "Total",
     "used_quota": "Used",
     "remaining_quota": "Balance",

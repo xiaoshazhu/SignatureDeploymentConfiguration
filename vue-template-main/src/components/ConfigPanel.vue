@@ -10,8 +10,9 @@
             <span>{{ $t('common.quota_title') }}</span>
           </div>
           <div class="quota-actions">
-            <el-button size="small" circle @click="showSetup = true">
+            <el-button size="small" @click="showSetup = true">
               <el-icon><Setting /></el-icon>
+              <span>{{ $t('common.setup_btn') }}</span>
             </el-button>
             <el-button type="primary" size="small" plain @click="showPricing = true">{{ $t('common.recharge_btn') }}</el-button>
           </div>

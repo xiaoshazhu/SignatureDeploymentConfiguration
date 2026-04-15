@@ -6,6 +6,7 @@
     "tip_batch_new_only": "批量生成只针对未生成签字链接的数据行",
     "quota_title": "套餐额度",
     "recharge_btn": "充值续费",
+    "setup_btn": "授权码配置",
     "total_quota": "总额度",
     "used_quota": "已使用",
     "remaining_quota": "剩余余额",
