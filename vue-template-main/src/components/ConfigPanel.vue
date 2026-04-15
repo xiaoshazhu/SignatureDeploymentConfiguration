@@ -44,7 +44,7 @@
       >
         <template #default>
           <div class="tips-content">
-            <p v-if="!isTokenSet" class="tip-mandatory">{{ $t('common.tip_setup_mandatory') }}</p>
+            <p class="tip-mandatory">{{ $t('common.tip_setup_mandatory') }}</p>
             <p>1、{{ $t('common.tip_switch_table') }}</p>
             <p>2、{{ $t('common.tip_consume_quota') }}</p>
             <p>3、{{ $t('common.tip_batch_new_only') }}</p>

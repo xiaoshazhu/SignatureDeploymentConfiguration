@@ -4,7 +4,7 @@
     "tip_switch_table": "After switching tables, please reopen the plugin.",
     "tip_consume_quota": "Operation consumes quota (1 record = 1 time).",
     "tip_batch_new_only": "Batch generation only targets records without links.",
-    "tip_setup_mandatory": "⚠️ Important: 'Token Config' must be completed before initializing the table.",
+    "tip_setup_mandatory": "⚠️ Important: 'Token Config' must be completed before generating signature links.",
     "quota_title": "Package Quota",
     "recharge_btn": "Recharge",
     "setup_btn": "Token Config",
