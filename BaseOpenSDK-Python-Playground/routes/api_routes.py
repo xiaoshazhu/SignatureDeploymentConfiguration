@@ -34,10 +34,12 @@ def set_personal_base_token():
 def check_config():
     """检查后台配置状态"""
     lark_client = current_app.config['LARK_CLIENT']
+    wechat_pay_service = current_app.config['WECHAT_PAY_SERVICE']
     return jsonify({
         "code": 0,
         "data": {
-            "token_set": bool(lark_client.personal_base_token)
+            "token_set": bool(lark_client.personal_base_token),
+            "notify_url": wechat_pay_service.notify_url
         }
     })
 
@@ -339,9 +341,19 @@ def generate_qrcode():
         
         logger.info(f"生成二维码 - URL: {url[:50]}..., app_token: {app_token[:20]}...")
         
-        # 从 app config 获取 lark_client
+        # 从 app config 获取 lark_client 和 quota_service
         lark_client = current_app.config['LARK_CLIENT']
+        quota_service = current_app.config['QUOTA_SERVICE']
         
+        # 获取租户标识
+        tenant_key = data.get('tenant_key')
+        if not tenant_key:
+            return jsonify({"code": 401, "msg": "缺少租户标识"}), 401
+
+        # 额度校验
+        if not quota_service.check_quota(tenant_key, 1):
+            return jsonify({"code": 403, "msg": "套餐余额不足,请及时充值"}), 403
+            
         # 生成二维码并上传
         file_token = lark_client.generate_qrcode(url, app_token)
         
@@ -354,6 +366,9 @@ def generate_qrcode():
             }
             lark_client.update_bitable_record(app_token, table_id, record_id, update_fields)
             logger.info(f"二维码已写入多维表格 - record_id: {record_id}")
+            
+            # 操作成功后扣除额度
+            quota_service.consume_quota(tenant_key, 1)
         except Exception as e:
             logger.warning(f"写入二维码到多维表格失败: {e}")
             # 即使写入失败,也返回成功,因为二维码已生成
@@ -573,6 +588,8 @@ def batch_generate_links():
                     
                     if result[0] == 'success':
                         success_count += 1
+                        # 逐条扣除额度,确保实时更新
+                        quota_service.consume_quota(tenant_key, 1)
                     else:
                         error_count += 1
                     
@@ -586,10 +603,6 @@ def batch_generate_links():
         
         logger.info(f"批量生成完成 - 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}, 配额不足跳过: {quota_skip_count}")
         
-        # 扣除相应额度
-        if success_count > 0:
-            quota_service.consume_quota(tenant_key, success_count)
-
         msg = "批量生成完成"
         if quota_skip_count > 0:
             msg = f"批量生成完成。因配额不足,有{quota_skip_count}条记录被跳过,请充值后续处理。"
@@ -700,13 +713,32 @@ def wechat_notify():
     """微信支付回调"""
     # 微信支付要求返回 200 或其他指定格式
     try:
-        headers = dict(request.headers)
-        body = request.data.decode('utf-8')
+        # 从 Flask 忽略大小写的 header 对象中精确提取微信要求的 4 个字段
+        clean_headers = {
+            'Wechatpay-Signature': request.headers.get('Wechatpay-Signature'),
+            'Wechatpay-Timestamp': request.headers.get('Wechatpay-Timestamp'),
+            'Wechatpay-Nonce': request.headers.get('Wechatpay-Nonce'),
+            'Wechatpay-Serial': request.headers.get('Wechatpay-Serial')
+        }
+        
+        body = request.get_data(as_text=True)
+        
+        # 强制将收到的请求头和 body 写入专门的调试文件
+        import datetime
+        import traceback
+        try:
+            with open("wechat_debug_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"\n[{datetime.datetime.now()}] WECHAT NOTIFY HIT!\n")
+                f.write(f"Headers: {dict(request.headers)}\n")
+                f.write(f"Body: {body}\n")
+        except Exception:
+            logger.error("Failed to write wechat_debug_log.txt")
+            logger.error(traceback.format_exc())
         
         wechat_pay_service = current_app.config['WECHAT_PAY_SERVICE']
         quota_service = current_app.config['QUOTA_SERVICE']
         
-        resource = wechat_pay_service.verify_callback(headers, body)
+        resource = wechat_pay_service.verify_callback(clean_headers, body)
         if resource:
             order_id = resource.get('out_trade_no')
             transaction_id = resource.get('transaction_id')
@@ -740,3 +772,30 @@ def get_payment_status(order_id):
     except Exception as e:
         logger.error(f"Error in get_payment_status: {e}")
         return jsonify({"code": 500, "msg": str(e)}), 500
+
+@api_bp.route('/pay/debug-logs', methods=['GET'])
+def get_debug_logs():
+    """临时诊断接口:读取后端运行日志"""
+    try:
+        import os
+        log_paths = [
+            'wechat_debug_log.txt', 
+            '/www/wwwroot/feishu_api_sgin/wechat_debug_log.txt', 
+            '/www/wwwlogs/sign-pri.anhuishuzhi.com.log',
+            '/www/wwwlogs/sign-pri.anhuishuzhi.com.error.log',
+            'backend.log', 
+            'nohup.out'
+        ]
+        logs = {}
+        for path in log_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    # 取最后 100 行
+                    logs[path] = "".join(f.readlines()[-100:])
+            else:
+                logs[path] = "Not Found"
+                
+        # 获取回调失败的原始尝试(如果记录了的话)
+        return jsonify({"code": 0, "logs": logs})
+    except Exception as e:
+        return jsonify({"code": 500, "msg": str(e)})

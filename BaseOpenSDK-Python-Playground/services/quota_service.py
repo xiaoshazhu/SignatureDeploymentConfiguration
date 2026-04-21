@@ -129,7 +129,10 @@ class QuotaService:
                         (count, now, tenant_key)
                     )
                 conn.commit()
-            logger.info(f"Consumed {count} quota for tenant: {tenant_key}")
+            
+            # 获取更新后的信息用于日志输出
+            new_info = self.get_quota_info(tenant_key)
+            logger.info(f"[QUOTA AUDIT] Tenant: {tenant_key} | Consumed: {count} | Remaining: {new_info['remaining'] if new_info else 'Unknown'}")
             return True
         except Exception as e:
             logger.error(f"Failed to consume quota for {tenant_key}: {e}")

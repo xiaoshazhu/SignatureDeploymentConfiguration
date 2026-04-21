@@ -16,6 +16,13 @@ class WechatPayService:
         self.appid = os.getenv('WECHAT_APP_ID')
         self.notify_url = os.getenv('WECHAT_NOTIFY_URL')
         
+        # 自动纠错逻辑：防止宝塔或是系统残留旧的 FRP 地址
+        host_url = os.getenv('HOST_URL', '').rstrip('/')
+        if not self.notify_url or 'frp2.yiknet.com' in self.notify_url:
+            if host_url:
+                self.notify_url = f"{host_url}/api/pay/wechat-notify"
+                logger.info(f"Auto-corrected WECHAT_NOTIFY_URL to: {self.notify_url}")
+        
         # 新增:公钥模式支持
         self.pub_key_id = os.getenv('WECHAT_PUB_KEY_ID')
         self.pub_key_path = os.getenv('WECHAT_PUB_KEY_PATH')
@@ -101,6 +108,27 @@ class WechatPayService:
             logger.error(f"Exception during WeChat Pay order creation: {e}")
             return None
 
+    def query_order(self, order_id):
+        """
+        主动查询订单状态
+        """
+        if not self.wxpay:
+            return None
+            
+        try:
+            # 使用 wechatpayv3 的 query 方法
+            code, message = self.wxpay.query(out_trade_no=order_id)
+            if code == 200:
+                import json
+                data = json.loads(message)
+                return data
+            else:
+                logger.error(f"WeChat Pay order query failed: {code} - {message}")
+                return None
+        except Exception as e:
+            logger.error(f"Exception during WeChat Pay order query: {e}")
+            return None
+
     def verify_callback(self, headers, body):
         """
         验证回调通知
@@ -109,11 +137,22 @@ class WechatPayService:
             return None
             
         try:
-            # 使用库提供的回调解析
+            # 1. 先解析原始 JSON 获取事件类型
+            import json
+            data = json.loads(body)
+            event_type = data.get('event_type')
+            
+            # 2. 使用库提供的回调解析（验证签名并解密数据）
+            # 注意：wechatpayv3 的 callback 返回的是解密后的 resource 内容
             result = self.wxpay.callback(headers, body)
-            if result and result.get('event_type') == 'TRANSACTION.SUCCESS':
-                return result.get('resource')
+            
+            if result and event_type == 'TRANSACTION.SUCCESS':
+                # 返回内部解密后的真实订单资源（包含 out_trade_no 等）
+                return result
+                
             return None
         except Exception as e:
+            import traceback
             logger.error(f"WeChat callback verification failed: {e}")
+            logger.error(traceback.format_exc())
             return None

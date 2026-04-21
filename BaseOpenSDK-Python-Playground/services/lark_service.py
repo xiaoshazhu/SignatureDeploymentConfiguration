@@ -181,20 +181,36 @@ class LarkClient:
         return self.update_bitable_record(app_token, table_id, record_id, fields)
 
     def get_records(self, app_token, table_id, page_size=500):
-        """获取多维表格所有记录"""
+        """获取多维表格所有记录(支持分页提取所有)"""
         self.client._config.app_token = app_token
-        request = ListAppTableRecordRequest.builder() \
-            .table_id(table_id) \
-            .page_size(page_size) \
-            .build()
+        all_items = []
+        page_token = None
         
-        response = self.client.base.v1.app_table_record.list(request)
-        if response.success():
-            items = response.data.items
-            return [{"record_id": it.record_id, "fields": it.fields} for it in items]
-        else:
-            logger.error(f"List records failed: {response.code} {response.msg}")
-            raise Exception(f"List records failed: {response.msg}")
+        while True:
+            builder = ListAppTableRecordRequest.builder() \
+                .table_id(table_id) \
+                .page_size(page_size)
+                
+            if page_token:
+                builder.page_token(page_token)
+                
+            request = builder.build()
+            response = self.client.base.v1.app_table_record.list(request)
+            
+            if response.success():
+                items = response.data.items
+                if items:
+                    all_items.extend([{"record_id": it.record_id, "fields": it.fields} for it in items])
+                    
+                if response.data.has_more:
+                    page_token = response.data.page_token
+                else:
+                    break
+            else:
+                logger.error(f"List records failed: {response.code} {response.msg}")
+                raise Exception(f"List records failed: {response.msg}")
+                
+        return all_items
 
     def search_records(self, app_token, table_id, filter_conditions):
         """搜索记录"""

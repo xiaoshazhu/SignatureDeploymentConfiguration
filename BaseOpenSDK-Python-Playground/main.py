@@ -19,19 +19,23 @@ def create_app():
     # 启用CORS,允许跨域请求
     CORS(app, resources={
         r"/api/*": {
-            "origins": ["https://localhost:5173", "https://172.20.20.3:5173", "https://*.feishu.cn"],
+            "origins": "*", 
+
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
         }
     })
     
     # 加载配置
-    # 尝试加载 .env (如果 python-dotenv 存在)
+    # 强制覆盖模式，确保 .env 文件中的值始终生效
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except ImportError:
         logger.warning("python-dotenv not installed, skipping .env loading")
+
+    # 关键配置日志
+    logger.info(f"Active WECHAT_NOTIFY_URL: {os.getenv('WECHAT_NOTIFY_URL')}")
 
     app_id = os.getenv("APP_ID")
     app_secret = os.getenv("APP_SECRET")
@@ -60,6 +64,33 @@ def create_app():
 
     # 注册路由
     app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # 辅助接口：允许手动触发订单同步 (用于回调失败时的补救)
+    @app.route('/api/pay/sync/<tenant_key>', methods=['GET', 'POST'])
+    def sync_tenant_orders(tenant_key):
+        quota_service = app.config['QUOTA_SERVICE']
+        wechat_pay_service = app.config['WECHAT_PAY_SERVICE']
+        
+        # 获取该租户所有 PENDING 状态的订单
+        try:
+            import sqlite3
+            with sqlite3.connect(quota_service.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT order_id FROM payment_orders WHERE tenant_key = ? AND status = 'PENDING'", (tenant_key,))
+                pending_orders = [row[0] for row in cursor.fetchall()]
+            
+            synced_count = 0
+            for order_id in pending_orders:
+                result = wechat_pay_service.query_order(order_id)
+                if result and result.get('trade_state') == 'SUCCESS':
+                    transaction_id = result.get('transaction_id')
+                    quota_service.update_payment_status(order_id, 'SUCCESS', transaction_id)
+                    synced_count += 1
+            
+            return {"code": 0, "msg": f"Synced {len(pending_orders)} orders, {synced_count} updated to SUCCESS"}, 200
+        except Exception as e:
+            return {"code": -1, "msg": str(e)}, 500
+
     app.register_blueprint(page_bp)
 
     return app

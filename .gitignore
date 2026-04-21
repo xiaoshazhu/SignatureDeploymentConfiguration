@@ -71,3 +71,8 @@ htmlcov/
 
 # 部署文件
 backend-deploy.tar.gz
+
+Deploy_To_BT/
+*.db
+wechat_debug_log.txt
+backend.zip

@@ -10,6 +10,9 @@
             <span>{{ $t('common.quota_title') }}</span>
           </div>
           <div class="quota-actions">
+            <el-button size="small" link @click="fetchQuota">
+              <el-icon><Refresh /></el-icon>
+            </el-button>
             <el-badge :is-dot="!isTokenSet" type="danger">
               <el-button size="small" :type="!isTokenSet ? 'danger' : ''" :plain="isTokenSet" @click="showSetup = true">
                 <el-icon><Setting /></el-icon>
@@ -446,6 +449,7 @@ const saveToken = async () => {
 };
 
 const pricingPlans = [
+  { quota: 5, price: '0.1元' },
   { quota: 500, price: '19.9元' },
   { quota: 1000, price: '35.0元' },
   { quota: 5000, price: '119.0元' },
@@ -468,7 +472,9 @@ const fetchQuota = async () => {
 
   try {
     const apiBase = import.meta.env.VITE_API_BASE || '';
-    const res = await fetch(`${apiBase}/quota/status?tenant_key=${tenantKey.value}`);
+    // 先同步可能存在的微信支付回调丢失订单
+    await fetch(`${apiBase}/pay/sync/${tenantKey.value}`);
+    const res = await fetch(`${apiBase}/quota/status?tenant_key=${tenantKey.value}&t=${Date.now()}`);
     const result = await res.json();
     if (result.code === 0) {
       quotaInfo.value = result.data;
@@ -485,7 +491,7 @@ const startPolling = (orderId) => {
   const apiBase = import.meta.env.VITE_API_BASE || '';
   pollingTimer.value = setInterval(async () => {
     try {
-      const res = await fetch(`${apiBase}/pay/status/${orderId}`);
+      const res = await fetch(`${apiBase}/pay/status/${orderId}?t=${Date.now()}`);
       const result = await res.json();
       if (result.code === 0 && result.status === 'SUCCESS') {
         clearInterval(pollingTimer.value);
