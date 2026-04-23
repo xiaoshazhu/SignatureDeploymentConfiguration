@@ -6,7 +6,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/
 downloads/
 eggs/
 .eggs/
@@ -54,7 +54,8 @@ pnpm-debug.log*
 .pnpm-debug.log*
 
 # Vue
-dist/
+# 允许根目录的 dist 提交以满足部署需求
+!dist/
 dist-ssr/
 *.local
 
@@ -76,3 +77,7 @@ Deploy_To_BT/
 *.db
 wechat_debug_log.txt
 backend.zip
+deploy_feishu/
+feishu_plugin_v2/
+feishu_plugin_v2_fixed.zip
+frontend_build.zip

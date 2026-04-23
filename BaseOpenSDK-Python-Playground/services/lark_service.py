@@ -180,19 +180,22 @@ class LarkClient:
         """
         return self.update_bitable_record(app_token, table_id, record_id, fields)
 
-    def get_records(self, app_token, table_id, page_size=500):
+    def get_records(self, app_token, table_id, page_size=100):
         """获取多维表格所有记录(支持分页提取所有)"""
+        # 显式确保配置了正确的 app_token
         self.client._config.app_token = app_token
         all_items = []
         page_token = None
         
         while True:
+            # 构建请求时确保 table_id 为字符串
             builder = ListAppTableRecordRequest.builder() \
-                .table_id(table_id) \
-                .page_size(page_size)
+                .table_id(str(table_id)) \
+                .page_size(page_size) \
+                .user_id_type("union_id") # 修复：显式指定用户ID类型，避免字段类型导致的Bad Request
                 
             if page_token:
-                builder.page_token(page_token)
+                builder.page_token(str(page_token))
                 
             request = builder.build()
             response = self.client.base.v1.app_table_record.list(request)
@@ -207,8 +210,9 @@ class LarkClient:
                 else:
                     break
             else:
-                logger.error(f"List records failed: {response.code} {response.msg}")
-                raise Exception(f"List records failed: {response.msg}")
+                # 记录更详细的错误日志方便排查
+                logger.error(f"List records failed! Code: {response.code}, Msg: {response.msg}, RequestID: {response.get_log_id()}")
+                raise Exception(f"List records failed: {response.msg} (LogID: {response.get_log_id()})")
                 
         return all_items
 
