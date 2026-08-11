@@ -1,0 +1,12 @@
+{
+  "name": "AHSZ-QianZi-Full",
+  "version": "1.0.0",
+  "output": "dist",
+  "scripts": {
+    "dev": "cd vue-template-main && npm run dev",
+    "build": "cd vue-template-main && npm run build"
+  },
+  "dependencies": {
+    "vue": "^3.2.37"
+  }
+}

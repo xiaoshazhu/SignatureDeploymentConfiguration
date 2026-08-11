@@ -1,0 +1,64 @@
+{
+    "schema_version": 1,
+    "revision": 23,
+    "currency": "CNY",
+    "unit": "次",
+    "plans": [
+        {
+            "plan_id": "plan_year_test",
+            "name": "试用授权 (1天)",
+            "billing_type": "duration",
+            "days": 1,
+            "price": 0.01,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_year_1",
+            "name": "1年无限次订阅",
+            "billing_type": "duration",
+            "days": 365,
+            "price": 990,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_year_2",
+            "name": "2年无限次订阅(85折)",
+            "billing_type": "duration",
+            "days": 730,
+            "price": 1683,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_year_3",
+            "name": "3年无限次订阅(8折)",
+            "billing_type": "duration",
+            "days": 1095,
+            "price": 2376,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_quota_1000",
+            "name": "1000次额度包",
+            "billing_type": "quota",
+            "quota": 1000,
+            "price": 399,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_quota_3500",
+            "name": "3500次额度包",
+            "billing_type": "quota",
+            "quota": 3500,
+            "price": 699,
+            "enabled": true
+        },
+        {
+            "plan_id": "plan_quota_25000",
+            "name": "25000次额度包",
+            "billing_type": "quota",
+            "quota": 25000,
+            "price": 3699,
+            "enabled": true
+        }
+    ]
+}

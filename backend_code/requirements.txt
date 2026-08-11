@@ -1,0 +1,12 @@
+Flask>=2.1.3
+requests>=2.31.0
+python-dotenv>=1.0.0
+qrcode[pil]>=8.2
+flask-cors>=6.0.1
+cryptography>=46.0.3
+Pillow>=10.0.0
+baseopensdk @ https://lf3-static.bytednsdoc.com/obj/eden-cn/lmeh7phbozvhoz/base-open-sdk/baseopensdk-0.0.12-py3-none-any.whl
+wechatpayv3>=2.0.0
+pymysql>=1.1.0
+websocket-client>=1.6.0
+psutil>=5.9.0
