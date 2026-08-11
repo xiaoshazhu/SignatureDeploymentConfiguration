@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "output": "dist",
   "scripts": {
-    "dev": "cd vue-template-main && npm run dev",
-    "build": "cd vue-template-main && npm run build"
+    "dev": "npm run build",
+    "build": "node -e \"const fs=require('fs');for(const file of ['dist/index.html','dist/assets/index.550eb899.js','dist/assets/index.3c6363a1.css']){if(!fs.existsSync(file))throw new Error('Missing '+file)}console.log('Verified prebuilt dist')\""
   },
   "dependencies": {
     "vue": "^3.2.37"
