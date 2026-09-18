@@ -4,7 +4,7 @@
   "output": "dist",
   "scripts": {
     "dev": "npm run build",
-    "build": "node -e \"const fs=require('fs');for(const file of ['dist/index.html','dist/assets/index.a1148ba5.js','dist/assets/index.9e99984e.css']){if(!fs.existsSync(file))throw new Error('Missing '+file)}console.log('Verified prebuilt dist')\""
+    "build": "node -e \"const fs=require('fs');for(const file of ['dist/index.html','dist/assets/index.0e1a6a22.js','dist/assets/index.e3d01d6d.css']){if(!fs.existsSync(file))throw new Error('Missing '+file)}console.log('Verified prebuilt dist')\""
   },
   "dependencies": {
     "vue": "^3.2.37"
